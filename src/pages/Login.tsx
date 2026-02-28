@@ -85,7 +85,11 @@ export default function Login() {
               {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
-          <div className="mt-6 p-3 rounded-lg bg-secondary">
+          <p className="text-center text-sm text-muted-foreground mt-4">
+            Don't have an account?{" "}
+            <a href="/signup" className="text-primary font-semibold hover:underline">Sign Up</a>
+          </p>
+          <div className="mt-4 p-3 rounded-lg bg-secondary">
             <p className="text-[10px] text-secondary-foreground font-semibold mb-1.5">Demo Accounts:</p>
             <div className="space-y-1 text-[10px] text-muted-foreground">
               <p><strong>Admin:</strong> admin@jkic.edu — pass: admin123</p>
