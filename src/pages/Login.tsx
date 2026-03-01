@@ -25,10 +25,14 @@ export default function Login() {
       return;
     }
     setLoading(true);
-    const { error } = await signIn(email, password);
+    const { error, role } = await signIn(email, password);
     setLoading(false);
     if (error) {
       toast.error(error.message || "Login failed. Please check your credentials.");
+    } else {
+      toast.success("Signed in successfully!");
+      const redirect = role === 'admin' ? '/admin' : role === 'teacher' ? '/teacher' : '/parent';
+      navigate(redirect, { replace: true });
     }
   };
 
