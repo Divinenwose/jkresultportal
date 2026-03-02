@@ -4,22 +4,26 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { User, FileText, ChevronRight, Search, UserPlus, UserMinus, Loader2 } from "lucide-react";
+import { User, FileText, ChevronRight, UserPlus, UserMinus, Loader2, GraduationCap } from "lucide-react";
 import { Link } from "react-router-dom";
+
+const ALL_CLASSES = ["JSS1", "JSS2", "JSS3", "SS1", "SS2", "SS3"] as const;
+const MAX_CHILDREN = 3;
 
 export default function ParentDashboard() {
   const { user } = useAuth();
   const [children, setChildren] = useState<any[]>([]);
   const [claimOpen, setClaimOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [classBrowse, setClassBrowse] = useState<Record<string, any[]>>({});
+  const [loadingClass, setLoadingClass] = useState<string | null>(null);
+  const [loadedClasses, setLoadedClasses] = useState<Set<string>>(new Set());
   const [claiming, setClaiming] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("JSS1");
 
   const fetchChildren = async () => {
     if (!user) return;
@@ -33,23 +37,42 @@ export default function ParentDashboard() {
 
   useEffect(() => { fetchChildren(); }, [user]);
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-    setSearching(true);
+  const fetchClassStudents = async (cls: string) => {
+    if (loadedClasses.has(cls)) return;
+    setLoadingClass(cls);
     const { data, error } = await supabase
       .from('students')
-      .select('id, full_name, class, gender, date_of_birth, parent_user_id')
-      .ilike('full_name', `%${searchQuery.trim()}%`)
+      .select('id, full_name, class, gender, spin')
+      .eq('class', cls as "JSS1" | "JSS2" | "JSS3" | "SS1" | "SS2" | "SS3")
       .is('parent_user_id', null)
-      .order('full_name')
-      .limit(10);
-    setSearching(false);
+      .order('full_name');
+    setLoadingClass(null);
     if (error) { toast.error(error.message); return; }
-    setSearchResults(data || []);
+    setClassBrowse(prev => ({ ...prev, [cls]: data || [] }));
+    setLoadedClasses(prev => new Set([...prev, cls]));
+  };
+
+  const handleTabChange = (cls: string) => {
+    setActiveTab(cls);
+    fetchClassStudents(cls);
+  };
+
+  const handleOpenDialog = (open: boolean) => {
+    setClaimOpen(open);
+    if (open) {
+      setActiveTab("JSS1");
+      setClassBrowse({});
+      setLoadedClasses(new Set());
+      fetchClassStudents("JSS1");
+    }
   };
 
   const handleClaim = async (studentId: string, studentName: string) => {
     if (!user) return;
+    if (children.length >= MAX_CHILDREN) {
+      toast.error(`You can only claim up to ${MAX_CHILDREN} children.`);
+      return;
+    }
     setClaiming(studentId);
     const { error } = await supabase
       .from('students')
@@ -59,7 +82,11 @@ export default function ParentDashboard() {
     setClaiming(null);
     if (error) { toast.error(error.message); return; }
     toast.success(`${studentName} has been linked to your account!`);
-    setSearchResults(prev => prev.filter(s => s.id !== studentId));
+    // Remove from browse list
+    setClassBrowse(prev => ({
+      ...prev,
+      [activeTab]: (prev[activeTab] || []).filter(s => s.id !== studentId),
+    }));
     fetchChildren();
   };
 
@@ -75,66 +102,94 @@ export default function ParentDashboard() {
     fetchChildren();
   };
 
+  const atLimit = children.length >= MAX_CHILDREN;
+
   return (
     <DashboardLayout title="Parent Dashboard">
       <div className="flex justify-between items-center mb-6">
         <p className="text-sm text-muted-foreground">
           {children.length === 0
-            ? "No children linked yet. Search and claim your child below."
+            ? "No children linked yet. Browse by class and claim your child below."
             : children.length === 1
             ? "Your ward's profile is shown below."
-            : `You have ${children.length} wards linked to your account.`}
+            : `You have ${children.length} ward${children.length > 1 ? "s" : ""} linked to your account.`}
         </p>
-        <Dialog open={claimOpen} onOpenChange={(o) => { setClaimOpen(o); if (!o) { setSearchQuery(""); setSearchResults([]); } }}>
+        <Dialog open={claimOpen} onOpenChange={handleOpenDialog}>
           <DialogTrigger asChild>
-            <Button variant="outline" size="sm">
-              <UserPlus className="h-4 w-4 mr-2" /> Claim a Child
+            <Button variant="outline" size="sm" disabled={atLimit}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              {atLimit ? "Limit Reached (3/3)" : "Claim a Child"}
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle className="font-display">Find & Claim Your Child</DialogTitle>
+              <DialogTitle className="font-display flex items-center gap-2">
+                <GraduationCap className="h-5 w-5 text-primary" /> Browse & Claim Your Child
+              </DialogTitle>
             </DialogHeader>
             <p className="text-sm text-muted-foreground">
-              Search for your child by name. Only students without a linked parent will appear.
+              Browse students by class. Only unclaimed students are shown.
+              {children.length > 0 && (
+                <span className="ml-1 font-medium text-foreground">
+                  ({children.length}/{MAX_CHILDREN} claimed)
+                </span>
+              )}
             </p>
-            <div className="flex gap-2 mt-2">
-              <Input
-                placeholder="Enter student's full name..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSearch()}
-              />
-              <Button onClick={handleSearch} disabled={searching || !searchQuery.trim()}>
-                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              </Button>
-            </div>
 
-            {searchResults.length === 0 && !searching && searchQuery && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No unclaimed students found for "{searchQuery}".
-              </p>
-            )}
-
-            {searchResults.length > 0 && (
-              <div className="space-y-2 max-h-64 overflow-y-auto mt-2">
-                {searchResults.map(s => (
-                  <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/40 transition-colors">
-                    <div>
-                      <p className="font-medium text-sm">{s.full_name}</p>
-                      <p className="text-xs text-muted-foreground">{s.class} · {s.gender}</p>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => handleClaim(s.id, s.full_name)}
-                      disabled={claiming === s.id}
-                    >
-                      {claiming === s.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <UserPlus className="h-3 w-3 mr-1" />}
-                      Claim
-                    </Button>
-                  </div>
-                ))}
+            {atLimit ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <UserPlus className="h-10 w-10 text-muted-foreground opacity-40 mb-3" />
+                <p className="font-medium">Maximum limit reached</p>
+                <p className="text-sm text-muted-foreground mt-1">You have claimed the maximum of {MAX_CHILDREN} children.</p>
               </div>
+            ) : (
+              <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col min-h-0 mt-2">
+                <TabsList className="grid grid-cols-6 w-full shrink-0">
+                  {ALL_CLASSES.map(cls => (
+                    <TabsTrigger key={cls} value={cls} className="text-xs">{cls}</TabsTrigger>
+                  ))}
+                </TabsList>
+
+                {ALL_CLASSES.map(cls => (
+                  <TabsContent key={cls} value={cls} className="flex-1 overflow-y-auto mt-3 min-h-0">
+                    {loadingClass === cls ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : !loadedClasses.has(cls) ? null : (classBrowse[cls] || []).length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-10">
+                        No unclaimed students in {cls}.
+                      </p>
+                    ) : (
+                      <div className="space-y-2 pr-1">
+                        {(classBrowse[cls] || []).map(s => (
+                          <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/40 transition-colors">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                                <User className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-sm">{s.full_name}</p>
+                                <p className="text-xs text-muted-foreground">{s.gender} · {s.spin}</p>
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={() => handleClaim(s.id, s.full_name)}
+                              disabled={claiming === s.id || atLimit}
+                            >
+                              {claiming === s.id
+                                ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                : <UserPlus className="h-3 w-3 mr-1" />}
+                              Claim
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+                ))}
+              </Tabs>
             )}
           </DialogContent>
         </Dialog>
@@ -145,7 +200,7 @@ export default function ParentDashboard() {
           <CardContent className="py-16 text-center">
             <UserPlus className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-40" />
             <p className="font-medium text-muted-foreground">No children linked to your account</p>
-            <p className="text-sm text-muted-foreground mt-1">Click "Claim a Child" above to search and link your child.</p>
+            <p className="text-sm text-muted-foreground mt-1">Click "Claim a Child" above to browse by class and link your child.</p>
           </CardContent>
         </Card>
       ) : (
@@ -179,6 +234,7 @@ export default function ParentDashboard() {
                     </AlertDialogContent>
                   </AlertDialog>
                 </div>
+                <Badge variant="secondary" className="w-fit text-xs">{child.class}</Badge>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-4">
