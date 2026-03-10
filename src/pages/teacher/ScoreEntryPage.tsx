@@ -145,7 +145,7 @@ export default function ScoreEntryPage() {
         <Card>
           <CardHeader className="py-3">
             <CardTitle className="text-sm font-display">
-              {currentAssignment?.subjects?.name} — {currentAssignment?.subjects?.class} • {CURRENT_TERM} {CURRENT_SESSION}
+              {currentAssignment?.subjects?.name} — {currentAssignment?.subjects?.class} • {settings.active_term} {settings.active_session}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0 overflow-x-auto">
