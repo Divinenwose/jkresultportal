@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { CURRENT_SESSION, CURRENT_TERM, calculateGrade } from "@/lib/constants";
+import { calculateGrade } from "@/lib/constants";
+import { useSettings } from "@/hooks/useSettings";
 import { Save } from "lucide-react";
 
 export default function ScoreEntryPage() {
