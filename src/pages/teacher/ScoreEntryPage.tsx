@@ -15,6 +15,7 @@ import { Save } from "lucide-react";
 
 export default function ScoreEntryPage() {
   const { user } = useAuth();
+  const { settings } = useSettings();
   const [assignments, setAssignments] = useState<any[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<string>("");
   const [students, setStudents] = useState<any[]>([]);
