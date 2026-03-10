@@ -169,6 +169,27 @@ export type Database = {
           },
         ]
       }
+      settings: {
+        Row: {
+          active_session: string
+          active_term: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          active_session?: string
+          active_term?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          active_session?: string
+          active_term?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       students: {
         Row: {
           class: Database["public"]["Enums"]["school_class"]
