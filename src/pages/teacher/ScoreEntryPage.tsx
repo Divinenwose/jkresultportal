@@ -9,11 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { CURRENT_SESSION, CURRENT_TERM, calculateGrade } from "@/lib/constants";
+import { calculateGrade } from "@/lib/constants";
+import { useSettings } from "@/hooks/useSettings";
 import { Save } from "lucide-react";
 
 export default function ScoreEntryPage() {
   const { user } = useAuth();
+  const { settings } = useSettings();
   const [assignments, setAssignments] = useState<any[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<string>("");
   const [students, setStudents] = useState<any[]>([]);
@@ -43,8 +45,8 @@ export default function ScoreEntryPage() {
         const { data: existingScores } = await supabase.from('scores')
           .select('*')
           .eq('subject_id', assignment.subjects.id)
-          .eq('term', CURRENT_TERM)
-          .eq('session', CURRENT_SESSION)
+          .eq('term', settings.active_term as any)
+          .eq('session', settings.active_session)
           .in('student_id', studs.map(s => s.id));
 
         const map: Record<string, any> = {};
@@ -53,7 +55,7 @@ export default function ScoreEntryPage() {
       }
     };
     fetch();
-  }, [selectedAssignment, assignments]);
+  }, [selectedAssignment, assignments, settings]);
 
   const updateLocal = (studentId: string, field: string, value: string) => {
     setScoreMap(prev => ({
@@ -78,8 +80,8 @@ export default function ScoreEntryPage() {
       const upsertData = {
         student_id: student.id,
         subject_id: assignment.subjects.id,
-        term: CURRENT_TERM as any,
-        session: CURRENT_SESSION,
+        term: settings.active_term as any,
+        session: settings.active_session,
         first_test: first,
         second_test: second,
         exam: exam,
@@ -107,8 +109,8 @@ export default function ScoreEntryPage() {
     const { data: refreshed } = await supabase.from('scores')
       .select('*')
       .eq('subject_id', assignment.subjects.id)
-      .eq('term', CURRENT_TERM)
-      .eq('session', CURRENT_SESSION)
+      .eq('term', settings.active_term as any)
+      .eq('session', settings.active_session)
       .in('student_id', students.map(s => s.id));
     const map: Record<string, any> = {};
     (refreshed || []).forEach(s => { map[s.student_id] = s; });
@@ -143,7 +145,7 @@ export default function ScoreEntryPage() {
         <Card>
           <CardHeader className="py-3">
             <CardTitle className="text-sm font-display">
-              {currentAssignment?.subjects?.name} — {currentAssignment?.subjects?.class} • {CURRENT_TERM} {CURRENT_SESSION}
+              {currentAssignment?.subjects?.name} — {currentAssignment?.subjects?.class} • {settings.active_term} {settings.active_session}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0 overflow-x-auto">

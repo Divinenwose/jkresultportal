@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { SCHOOL_NAME, SCHOOL_MOTTO, CURRENT_SESSION, CURRENT_TERM, GRADE_SCALE, calculateGrade } from "@/lib/constants";
+import { SCHOOL_NAME, SCHOOL_MOTTO, GRADE_SCALE, calculateGrade } from "@/lib/constants";
+import { useSettings } from "@/hooks/useSettings";
 import schoolLogo from "@/assets/school-logo.jpeg";
 import { Download, ArrowLeft } from "lucide-react";
 import html2canvas from "html2canvas";
@@ -15,6 +16,7 @@ import { useSearchParams, Link } from "react-router-dom";
 
 export default function ReportCardPage() {
   const { user } = useAuth();
+  const { settings, loading: settingsLoading } = useSettings();
   const [searchParams] = useSearchParams();
   const [children, setChildren] = useState<any[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string>("");
@@ -24,7 +26,6 @@ export default function ReportCardPage() {
   const [downloading, setDownloading] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
-  // Fetch all children of this parent
   useEffect(() => {
     if (!user) return;
     supabase.from('students').select('*').eq('parent_user_id', user.id).order('full_name')
@@ -32,29 +33,35 @@ export default function ReportCardPage() {
         const kids = data || [];
         setChildren(kids);
         const paramId = searchParams.get("studentId");
-        // Select from URL param or default to first child
         const initialId = paramId && kids.find(k => k.id === paramId) ? paramId : (kids[0]?.id || "");
         setSelectedChildId(initialId);
       });
   }, [user]);
 
-  // Fetch report data when child selection changes
   useEffect(() => {
-    if (!selectedChildId) { setChild(null); setReport(null); setScores([]); return; }
+    if (!selectedChildId || settingsLoading) { setChild(null); setReport(null); setScores([]); return; }
     const selected = children.find(c => c.id === selectedChildId);
     setChild(selected || null);
-
     if (!selected) return;
+
     const fetchReport = async () => {
       const [reportRes, scoresRes] = await Promise.all([
-        supabase.from('reports').select('*').eq('student_id', selected.id).eq('session', CURRENT_SESSION).eq('term', CURRENT_TERM).single(),
-        supabase.from('scores').select('*, subjects(name)').eq('student_id', selected.id).eq('session', CURRENT_SESSION).eq('term', CURRENT_TERM).order('subjects(name)'),
+        supabase.from('reports').select('*')
+          .eq('student_id', selected.id)
+          .eq('session', settings.active_session)
+          .eq('term', settings.active_term as any)
+          .single(),
+        supabase.from('scores').select('*, subjects(name)')
+          .eq('student_id', selected.id)
+          .eq('session', settings.active_session)
+          .eq('term', settings.active_term as any)
+          .order('subjects(name)'),
       ]);
       setReport(reportRes.data);
       setScores(scoresRes.data || []);
     };
     fetchReport();
-  }, [selectedChildId, children]);
+  }, [selectedChildId, children, settings, settingsLoading]);
 
   const handleDownload = async () => {
     if (!reportRef.current) return;
@@ -66,7 +73,7 @@ export default function ReportCardPage() {
       const imgWidth = 210;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-      pdf.save(`Report_${child?.spin}_${CURRENT_TERM}_${CURRENT_SESSION}.pdf`);
+      pdf.save(`Report_${child?.full_name}_${settings.active_term}_${settings.active_session}.pdf`);
     } catch (e) {
       console.error(e);
     }
@@ -129,14 +136,15 @@ export default function ReportCardPage() {
                 <img src={schoolLogo} alt="Logo" className="w-16 h-16 rounded-full mx-auto mb-2 object-cover" />
                 <h1 className="text-lg font-bold text-blue-800 uppercase">{SCHOOL_NAME}</h1>
                 <p className="text-[10px] italic text-gray-500">"{SCHOOL_MOTTO}"</p>
-                <p className="text-xs font-semibold mt-2 text-blue-700">STUDENT ACADEMIC REPORT — {CURRENT_TERM.toUpperCase()} {CURRENT_SESSION}</p>
+                <p className="text-xs font-semibold mt-2 text-blue-700">
+                  STUDENT ACADEMIC REPORT — {settings.active_term.toUpperCase()} {settings.active_session}
+                </p>
               </div>
 
-              {/* Student Info */}
+              {/* Student Info — SPIN removed */}
               <div className="grid grid-cols-3 gap-2 text-xs mb-4 border rounded p-3 bg-blue-50">
                 <div><span className="text-gray-500">Name:</span> <strong>{child.full_name}</strong></div>
                 <div><span className="text-gray-500">Class:</span> <strong>{child.class}</strong></div>
-                <div><span className="text-gray-500">SPIN:</span> <strong className="text-blue-700">{child.spin}</strong></div>
                 <div><span className="text-gray-500">Gender:</span> <strong>{child.gender}</strong></div>
                 {child.date_of_birth && <div><span className="text-gray-500">DOB:</span> <strong>{child.date_of_birth}</strong></div>}
               </div>

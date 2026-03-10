@@ -8,10 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { CLASSES, CURRENT_SESSION, CURRENT_TERM } from "@/lib/constants";
+import { CLASSES } from "@/lib/constants";
+import { useSettings } from "@/hooks/useSettings";
 import { CheckCircle } from "lucide-react";
 
 export default function ApprovePage() {
+  const { settings, loading: settingsLoading } = useSettings();
   const [selectedClass, setSelectedClass] = useState<string>("");
   const [students, setStudents] = useState<any[]>([]);
   const [reports, setReports] = useState<Record<string, any>>({});
@@ -19,7 +21,7 @@ export default function ApprovePage() {
   const [saving, setSaving] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!selectedClass) return;
+    if (!selectedClass || settingsLoading) return;
     const fetch = async () => {
       const { data: studs } = await supabase.from('students').select('*').eq('class', selectedClass as any).order('full_name');
       setStudents(studs || []);
@@ -27,8 +29,8 @@ export default function ApprovePage() {
       if (studs?.length) {
         const ids = studs.map(s => s.id);
         const [reportsRes, scoresRes] = await Promise.all([
-          supabase.from('reports').select('*').in('student_id', ids).eq('session', CURRENT_SESSION).eq('term', CURRENT_TERM),
-          supabase.from('scores').select('*, subjects(name)').in('student_id', ids).eq('session', CURRENT_SESSION).eq('term', CURRENT_TERM),
+          supabase.from('reports').select('*').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any),
+          supabase.from('scores').select('*, subjects(name)').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any),
         ]);
 
         const rMap: Record<string, any> = {};
@@ -44,7 +46,7 @@ export default function ApprovePage() {
       }
     };
     fetch();
-  }, [selectedClass]);
+  }, [selectedClass, settings, settingsLoading]);
 
   const handleCreateOrUpdateReport = async (studentId: string, field: string, value: any) => {
     const existing = reports[studentId];
@@ -58,8 +60,8 @@ export default function ApprovePage() {
 
       const { data } = await supabase.from('reports').insert({
         student_id: studentId,
-        term: CURRENT_TERM,
-        session: CURRENT_SESSION,
+        term: settings.active_term as any,
+        session: settings.active_session,
         total_marks: totalMarks,
         average: Math.round(avg * 100) / 100,
         [field]: value,
@@ -97,11 +99,16 @@ export default function ApprovePage() {
 
   return (
     <DashboardLayout title="Approve Results">
-      <div className="mb-4">
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
         <Select value={selectedClass} onValueChange={setSelectedClass}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Select Class" /></SelectTrigger>
           <SelectContent>{CLASSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
         </Select>
+        {!settingsLoading && (
+          <span className="text-xs text-muted-foreground">
+            Term: <span className="font-semibold text-foreground">{settings.active_term} — {settings.active_session}</span>
+          </span>
+        )}
       </div>
 
       {!selectedClass ? (
