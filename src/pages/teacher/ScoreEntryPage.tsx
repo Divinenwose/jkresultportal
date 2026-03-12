@@ -260,23 +260,23 @@ export default function ScoreEntryPage() {
 
                       {isSecondTerm && (
                         <>
-                          <TableCell className="bg-amber-50/50 text-center text-sm font-medium text-amber-800">
+                          <TableCell className="bg-accent/10 text-center text-sm font-medium text-accent-foreground">
                             {term1}
                           </TableCell>
-                          <TableCell className="bg-amber-50/50 text-center font-bold text-sm text-amber-900">
+                          <TableCell className="bg-accent/10 text-center font-bold text-sm text-primary">
                             {average.toFixed(1)}
                           </TableCell>
                         </>
                       )}
                       {isThirdTerm && (
                         <>
-                          <TableCell className="bg-amber-50/50 text-center text-sm font-medium text-amber-800">
+                          <TableCell className="bg-accent/10 text-center text-sm font-medium text-accent-foreground">
                             {term1}
                           </TableCell>
-                          <TableCell className="bg-amber-50/50 text-center text-sm font-medium text-amber-800">
+                          <TableCell className="bg-accent/10 text-center text-sm font-medium text-accent-foreground">
                             {term2}
                           </TableCell>
-                          <TableCell className="bg-amber-50/50 text-center font-bold text-sm text-amber-900">
+                          <TableCell className="bg-accent/10 text-center font-bold text-sm text-primary">
                             {average.toFixed(1)}
                           </TableCell>
                         </>
