@@ -202,15 +202,15 @@ export default function ScoreEntryPage() {
                   <TableHead className="w-16">Total (100)</TableHead>
                   {isSecondTerm && (
                     <>
-                      <TableHead className="w-24 bg-amber-50 text-amber-700">1st Term (100)</TableHead>
-                      <TableHead className="w-20 bg-amber-50 text-amber-700">Average</TableHead>
+                      <TableHead className="w-24 bg-accent/30 text-accent-foreground">1st Term (100)</TableHead>
+                      <TableHead className="w-20 bg-accent/30 text-accent-foreground">Average</TableHead>
                     </>
                   )}
                   {isThirdTerm && (
                     <>
-                      <TableHead className="w-24 bg-amber-50 text-amber-700">1st Term (100)</TableHead>
-                      <TableHead className="w-24 bg-amber-50 text-amber-700">2nd Term (100)</TableHead>
-                      <TableHead className="w-20 bg-amber-50 text-amber-700">Average</TableHead>
+                      <TableHead className="w-24 bg-accent/30 text-accent-foreground">1st Term (100)</TableHead>
+                      <TableHead className="w-24 bg-accent/30 text-accent-foreground">2nd Term (100)</TableHead>
+                      <TableHead className="w-20 bg-accent/30 text-accent-foreground">Average</TableHead>
                     </>
                   )}
                   <TableHead className="w-16">Grade</TableHead>
