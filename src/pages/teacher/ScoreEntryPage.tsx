@@ -149,8 +149,6 @@ export default function ScoreEntryPage() {
     toast.success("Scores saved and submitted!");
 
     // Refresh current term scores
-    const refreshAssignment = assignments.find(a => a.id === selectedAssignment);
-    if (!refreshAssignment) return;
     const { data: refreshed } = await supabase.from('scores')
       .select('*')
       .eq('subject_id', assignment.subjects.id)
