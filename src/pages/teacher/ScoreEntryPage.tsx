@@ -20,7 +20,14 @@ export default function ScoreEntryPage() {
   const [selectedAssignment, setSelectedAssignment] = useState<string>("");
   const [students, setStudents] = useState<any[]>([]);
   const [scoreMap, setScoreMap] = useState<Record<string, any>>({});
+  // Maps: studentId -> { term1Total, term2Total }
+  const [prevTermScores, setPrevTermScores] = useState<Record<string, { term1?: number; term2?: number }>>({});
   const [saving, setSaving] = useState(false);
+
+  const activeTerm = settings.active_term;
+  const isSecondTerm = activeTerm === "Second Term";
+  const isThirdTerm = activeTerm === "Third Term";
+  const showCumulative = isSecondTerm || isThirdTerm;
 
   useEffect(() => {
     if (!user) return;
@@ -42,20 +49,56 @@ export default function ScoreEntryPage() {
       setStudents(studs || []);
 
       if (studs?.length) {
+        const studentIds = studs.map(s => s.id);
+
+        // Fetch current term scores
         const { data: existingScores } = await supabase.from('scores')
           .select('*')
           .eq('subject_id', assignment.subjects.id)
           .eq('term', settings.active_term as any)
           .eq('session', settings.active_session)
-          .in('student_id', studs.map(s => s.id));
+          .in('student_id', studentIds);
 
         const map: Record<string, any> = {};
         (existingScores || []).forEach(s => { map[s.student_id] = s; });
         setScoreMap(map);
+
+        // Fetch previous term scores for cumulative display
+        if (isSecondTerm || isThirdTerm) {
+          const prevMap: Record<string, { term1?: number; term2?: number }> = {};
+
+          const { data: t1Scores } = await supabase.from('scores')
+            .select('student_id, total')
+            .eq('subject_id', assignment.subjects.id)
+            .eq('term', 'First Term' as any)
+            .eq('session', settings.active_session)
+            .in('student_id', studentIds);
+
+          (t1Scores || []).forEach(s => {
+            prevMap[s.student_id] = { ...prevMap[s.student_id], term1: Number(s.total) || 0 };
+          });
+
+          if (isThirdTerm) {
+            const { data: t2Scores } = await supabase.from('scores')
+              .select('student_id, total')
+              .eq('subject_id', assignment.subjects.id)
+              .eq('term', 'Second Term' as any)
+              .eq('session', settings.active_session)
+              .in('student_id', studentIds);
+
+            (t2Scores || []).forEach(s => {
+              prevMap[s.student_id] = { ...prevMap[s.student_id], term2: Number(s.total) || 0 };
+            });
+          }
+
+          setPrevTermScores(prevMap);
+        } else {
+          setPrevTermScores({});
+        }
       }
     };
     fetch();
-  }, [selectedAssignment, assignments, settings]);
+  }, [selectedAssignment, assignments, settings, isSecondTerm, isThirdTerm]);
 
   const updateLocal = (studentId: string, field: string, value: string) => {
     setScoreMap(prev => ({
@@ -105,7 +148,9 @@ export default function ScoreEntryPage() {
     setSaving(false);
     toast.success("Scores saved and submitted!");
 
-    // Refresh
+    // Refresh current term scores
+    const assignment = assignments.find(a => a.id === selectedAssignment);
+    if (!assignment) return;
     const { data: refreshed } = await supabase.from('scores')
       .select('*')
       .eq('subject_id', assignment.subjects.id)
@@ -156,7 +201,20 @@ export default function ScoreEntryPage() {
                   <TableHead className="w-20">1st Test (20)</TableHead>
                   <TableHead className="w-20">2nd Test (20)</TableHead>
                   <TableHead className="w-20">Exam (60)</TableHead>
-                  <TableHead className="w-16">Total</TableHead>
+                  <TableHead className="w-16">Total (100)</TableHead>
+                  {isSecondTerm && (
+                    <>
+                      <TableHead className="w-24 bg-amber-50 text-amber-700">1st Term (100)</TableHead>
+                      <TableHead className="w-20 bg-amber-50 text-amber-700">Average</TableHead>
+                    </>
+                  )}
+                  {isThirdTerm && (
+                    <>
+                      <TableHead className="w-24 bg-amber-50 text-amber-700">1st Term (100)</TableHead>
+                      <TableHead className="w-24 bg-amber-50 text-amber-700">2nd Term (100)</TableHead>
+                      <TableHead className="w-20 bg-amber-50 text-amber-700">Average</TableHead>
+                    </>
+                  )}
                   <TableHead className="w-16">Grade</TableHead>
                   <TableHead className="min-w-[120px]">Comment</TableHead>
                 </TableRow>
@@ -168,7 +226,22 @@ export default function ScoreEntryPage() {
                   const second = Number(s.second_test) || 0;
                   const exam = Number(s.exam) || 0;
                   const total = first + second + exam;
-                  const grade = calculateGrade(total);
+
+                  const prev = prevTermScores[student.id] || {};
+                  const term1 = prev.term1 ?? 0;
+                  const term2 = prev.term2 ?? 0;
+
+                  let average = total;
+                  let termCount = 1;
+                  if (isSecondTerm) {
+                    average = (total + term1) / 2;
+                    termCount = 2;
+                  } else if (isThirdTerm) {
+                    average = (total + term1 + term2) / 3;
+                    termCount = 3;
+                  }
+
+                  const displayGrade = showCumulative ? calculateGrade(average) : calculateGrade(total);
 
                   return (
                     <TableRow key={student.id}>
@@ -186,12 +259,37 @@ export default function ScoreEntryPage() {
                           value={s.exam ?? ''} onChange={e => updateLocal(student.id, 'exam', e.target.value)} />
                       </TableCell>
                       <TableCell className="font-bold text-sm">{total}</TableCell>
+
+                      {isSecondTerm && (
+                        <>
+                          <TableCell className="bg-amber-50/50 text-center text-sm font-medium text-amber-800">
+                            {term1}
+                          </TableCell>
+                          <TableCell className="bg-amber-50/50 text-center font-bold text-sm text-amber-900">
+                            {average.toFixed(1)}
+                          </TableCell>
+                        </>
+                      )}
+                      {isThirdTerm && (
+                        <>
+                          <TableCell className="bg-amber-50/50 text-center text-sm font-medium text-amber-800">
+                            {term1}
+                          </TableCell>
+                          <TableCell className="bg-amber-50/50 text-center text-sm font-medium text-amber-800">
+                            {term2}
+                          </TableCell>
+                          <TableCell className="bg-amber-50/50 text-center font-bold text-sm text-amber-900">
+                            {average.toFixed(1)}
+                          </TableCell>
+                        </>
+                      )}
+
                       <TableCell>
                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                          grade === 'A1' ? 'bg-success/20 text-success' :
-                          grade === 'F9' ? 'bg-destructive/20 text-destructive' :
+                          displayGrade === 'A1' ? 'bg-success/20 text-success' :
+                          displayGrade === 'F9' ? 'bg-destructive/20 text-destructive' :
                           'bg-secondary text-secondary-foreground'
-                        }`}>{grade}</span>
+                        }`}>{displayGrade}</span>
                       </TableCell>
                       <TableCell>
                         <Textarea className="min-h-[32px] text-xs resize-none" rows={1}
