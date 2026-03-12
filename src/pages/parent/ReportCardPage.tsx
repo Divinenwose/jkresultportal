@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SCHOOL_NAME, SCHOOL_MOTTO, GRADE_SCALE, calculateGrade } from "@/lib/constants";
 import { useSettings } from "@/hooks/useSettings";
 import schoolLogo from "@/assets/school-logo.jpeg";
@@ -23,8 +22,15 @@ export default function ReportCardPage() {
   const [child, setChild] = useState<any>(null);
   const [report, setReport] = useState<any>(null);
   const [scores, setScores] = useState<any[]>([]);
+  // previous term cumulative scores: subjectId -> { term1Total, term2Total }
+  const [prevScoreMap, setPrevScoreMap] = useState<Record<string, { term1?: number; term2?: number }>>({});
   const [downloading, setDownloading] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
+
+  const activeTerm = settings.active_term;
+  const isSecondTerm = activeTerm === "Second Term";
+  const isThirdTerm = activeTerm === "Third Term";
+  const showCumulative = isSecondTerm || isThirdTerm;
 
   useEffect(() => {
     if (!user) return;
@@ -39,7 +45,7 @@ export default function ReportCardPage() {
   }, [user]);
 
   useEffect(() => {
-    if (!selectedChildId || settingsLoading) { setChild(null); setReport(null); setScores([]); return; }
+    if (!selectedChildId || settingsLoading) { setChild(null); setReport(null); setScores([]); setPrevScoreMap({}); return; }
     const selected = children.find(c => c.id === selectedChildId);
     setChild(selected || null);
     if (!selected) return;
@@ -51,7 +57,7 @@ export default function ReportCardPage() {
           .eq('session', settings.active_session)
           .eq('term', settings.active_term as any)
           .single(),
-        supabase.from('scores').select('*, subjects(name)')
+        supabase.from('scores').select('*, subjects(name, id)')
           .eq('student_id', selected.id)
           .eq('session', settings.active_session)
           .eq('term', settings.active_term as any)
@@ -59,9 +65,40 @@ export default function ReportCardPage() {
       ]);
       setReport(reportRes.data);
       setScores(scoresRes.data || []);
+
+      // Fetch previous term totals for cumulative display
+      if (isSecondTerm || isThirdTerm) {
+        const pMap: Record<string, { term1?: number; term2?: number }> = {};
+
+        const { data: t1 } = await supabase.from('scores')
+          .select('subject_id, total')
+          .eq('student_id', selected.id)
+          .eq('session', settings.active_session)
+          .eq('term', 'First Term' as any);
+
+        (t1 || []).forEach(s => {
+          pMap[s.subject_id] = { ...pMap[s.subject_id], term1: Number(s.total) || 0 };
+        });
+
+        if (isThirdTerm) {
+          const { data: t2 } = await supabase.from('scores')
+            .select('subject_id, total')
+            .eq('student_id', selected.id)
+            .eq('session', settings.active_session)
+            .eq('term', 'Second Term' as any);
+
+          (t2 || []).forEach(s => {
+            pMap[s.subject_id] = { ...pMap[s.subject_id], term2: Number(s.total) || 0 };
+          });
+        }
+
+        setPrevScoreMap(pMap);
+      } else {
+        setPrevScoreMap({});
+      }
     };
     fetchReport();
-  }, [selectedChildId, children, settings, settingsLoading]);
+  }, [selectedChildId, children, settings, settingsLoading, isSecondTerm, isThirdTerm]);
 
   const handleDownload = async () => {
     if (!reportRef.current) return;
@@ -81,7 +118,8 @@ export default function ReportCardPage() {
   };
 
   const totalMarks = scores.reduce((sum, s) => sum + (Number(s.total) || 0), 0);
-  const average = scores.length ? totalMarks / scores.length : 0;
+  const subjectCount = scores.length || 1;
+  const average = scores.length ? totalMarks / subjectCount : 0;
 
   if (children.length === 0) {
     return (
@@ -141,7 +179,7 @@ export default function ReportCardPage() {
                 </p>
               </div>
 
-              {/* Student Info — SPIN removed */}
+              {/* Student Info */}
               <div className="grid grid-cols-3 gap-2 text-xs mb-4 border rounded p-3 bg-blue-50">
                 <div><span className="text-gray-500">Name:</span> <strong>{child.full_name}</strong></div>
                 <div><span className="text-gray-500">Class:</span> <strong>{child.class}</strong></div>
@@ -165,22 +203,61 @@ export default function ReportCardPage() {
                     <th className="border p-1.5 text-center">2nd Test (20)</th>
                     <th className="border p-1.5 text-center">Exam (60)</th>
                     <th className="border p-1.5 text-center">Total (100)</th>
+                    {isSecondTerm && (
+                      <>
+                        <th className="border p-1.5 text-center bg-blue-700">1st Term (100)</th>
+                        <th className="border p-1.5 text-center bg-blue-700">Average</th>
+                      </>
+                    )}
+                    {isThirdTerm && (
+                      <>
+                        <th className="border p-1.5 text-center bg-blue-700">1st Term (100)</th>
+                        <th className="border p-1.5 text-center bg-blue-700">2nd Term (100)</th>
+                        <th className="border p-1.5 text-center bg-blue-700">Average</th>
+                      </>
+                    )}
                     <th className="border p-1.5 text-center">Grade</th>
                     <th className="border p-1.5 text-left">Remark</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {scores.map((s, i) => (
-                    <tr key={s.id} className={i % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
-                      <td className="border p-1.5 font-medium">{s.subjects?.name}</td>
-                      <td className="border p-1.5 text-center">{s.first_test ?? '—'}</td>
-                      <td className="border p-1.5 text-center">{s.second_test ?? '—'}</td>
-                      <td className="border p-1.5 text-center">{s.exam ?? '—'}</td>
-                      <td className="border p-1.5 text-center font-bold">{s.total ?? '—'}</td>
-                      <td className="border p-1.5 text-center font-bold text-blue-700">{s.grade ?? '—'}</td>
-                      <td className="border p-1.5 text-gray-600">{s.subject_comment || '—'}</td>
-                    </tr>
-                  ))}
+                  {scores.map((s, i) => {
+                    const prev = prevScoreMap[s.subjects?.id] || {};
+                    const term1 = prev.term1 ?? 0;
+                    const term2 = prev.term2 ?? 0;
+                    const currentTotal = Number(s.total) || 0;
+
+                    let rowAvg = currentTotal;
+                    if (isSecondTerm) rowAvg = (currentTotal + term1) / 2;
+                    else if (isThirdTerm) rowAvg = (currentTotal + term1 + term2) / 3;
+
+                    const rowGrade = showCumulative ? calculateGrade(rowAvg) : (s.grade ?? calculateGrade(currentTotal));
+
+                    return (
+                      <tr key={s.id} className={i % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                        <td className="border p-1.5 font-medium">{s.subjects?.name}</td>
+                        <td className="border p-1.5 text-center">{s.first_test ?? '—'}</td>
+                        <td className="border p-1.5 text-center">{s.second_test ?? '—'}</td>
+                        <td className="border p-1.5 text-center">{s.exam ?? '—'}</td>
+                        <td className="border p-1.5 text-center font-bold">{s.total ?? '—'}</td>
+                        {isSecondTerm && (
+                          <>
+                            <td className="border p-1.5 text-center bg-blue-100">{term1}</td>
+                            <td className="border p-1.5 text-center font-bold bg-blue-100">{rowAvg.toFixed(1)}</td>
+                          </>
+                        )}
+                        {isThirdTerm && (
+                          <>
+                            <td className="border p-1.5 text-center bg-blue-100">{term1}</td>
+                            <td className="border p-1.5 text-center bg-blue-100">{term2}</td>
+                            <td className="border p-1.5 text-center font-bold bg-blue-100">{rowAvg.toFixed(1)}</td>
+                          </>
+                        )}
+                        <td className="border p-1.5 text-center font-bold text-blue-700">{rowGrade}</td>
+                        <td className="border p-1.5 text-gray-600">{s.subject_comment || '—'}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
 
