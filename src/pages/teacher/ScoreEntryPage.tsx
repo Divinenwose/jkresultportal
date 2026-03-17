@@ -107,6 +107,13 @@ export default function ScoreEntryPage() {
     }));
   };
 
+  const updatePrevTerm = (studentId: string, termKey: 'term1' | 'term2', value: string) => {
+    setPrevTermScores(prev => ({
+      ...prev,
+      [studentId]: { ...prev[studentId], [termKey]: value === '' ? 0 : Number(value) }
+    }));
+  };
+
   const handleSaveAll = async () => {
     const assignment = assignments.find(a => a.id === selectedAssignment);
     if (!assignment) return;
