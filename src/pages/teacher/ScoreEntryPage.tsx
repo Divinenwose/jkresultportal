@@ -107,6 +107,13 @@ export default function ScoreEntryPage() {
     }));
   };
 
+  const updatePrevTerm = (studentId: string, termKey: 'term1' | 'term2', value: string) => {
+    setPrevTermScores(prev => ({
+      ...prev,
+      [studentId]: { ...prev[studentId], [termKey]: value === '' ? 0 : Number(value) }
+    }));
+  };
+
   const handleSaveAll = async () => {
     const assignment = assignments.find(a => a.id === selectedAssignment);
     if (!assignment) return;
@@ -161,6 +168,8 @@ export default function ScoreEntryPage() {
   };
 
   const currentAssignment = assignments.find(a => a.id === selectedAssignment);
+  const currentClass = currentAssignment?.subjects?.class || currentAssignment?.class || '';
+  const isJSS = ['JSS1', 'JSS2', 'JSS3'].includes(currentClass);
 
   return (
     <DashboardLayout title="Enter Scores">
@@ -213,7 +222,7 @@ export default function ScoreEntryPage() {
                       <TableHead className="w-20 bg-accent/30 text-accent-foreground">Average</TableHead>
                     </>
                   )}
-                  <TableHead className="w-16">Grade</TableHead>
+                  {!isJSS && <TableHead className="w-16">Grade</TableHead>}
                   <TableHead className="min-w-[120px]">Comment</TableHead>
                 </TableRow>
               </TableHeader>
@@ -226,17 +235,14 @@ export default function ScoreEntryPage() {
                   const total = first + second + exam;
 
                   const prev = prevTermScores[student.id] || {};
-                  const term1 = prev.term1 ?? 0;
-                  const term2 = prev.term2 ?? 0;
+                  const term1Val = prev.term1 ?? 0;
+                  const term2Val = prev.term2 ?? 0;
 
                   let average = total;
-                  let termCount = 1;
                   if (isSecondTerm) {
-                    average = (total + term1) / 2;
-                    termCount = 2;
+                    average = (total + term1Val) / 2;
                   } else if (isThirdTerm) {
-                    average = (total + term1 + term2) / 3;
-                    termCount = 3;
+                    average = (total + term1Val + term2Val) / 3;
                   }
 
                   const displayGrade = showCumulative ? calculateGrade(average) : calculateGrade(total);
@@ -260,8 +266,9 @@ export default function ScoreEntryPage() {
 
                       {isSecondTerm && (
                         <>
-                          <TableCell className="bg-accent/10 text-center text-sm font-medium text-accent-foreground">
-                            {term1}
+                          <TableCell className="bg-accent/10 p-1">
+                            <Input type="number" min={0} max={100} className="h-8 text-sm w-20"
+                              value={prev.term1 ?? ''} onChange={e => updatePrevTerm(student.id, 'term1', e.target.value)} />
                           </TableCell>
                           <TableCell className="bg-accent/10 text-center font-bold text-sm text-primary">
                             {average.toFixed(1)}
@@ -270,11 +277,13 @@ export default function ScoreEntryPage() {
                       )}
                       {isThirdTerm && (
                         <>
-                          <TableCell className="bg-accent/10 text-center text-sm font-medium text-accent-foreground">
-                            {term1}
+                          <TableCell className="bg-accent/10 p-1">
+                            <Input type="number" min={0} max={100} className="h-8 text-sm w-20"
+                              value={prev.term1 ?? ''} onChange={e => updatePrevTerm(student.id, 'term1', e.target.value)} />
                           </TableCell>
-                          <TableCell className="bg-accent/10 text-center text-sm font-medium text-accent-foreground">
-                            {term2}
+                          <TableCell className="bg-accent/10 p-1">
+                            <Input type="number" min={0} max={100} className="h-8 text-sm w-20"
+                              value={prev.term2 ?? ''} onChange={e => updatePrevTerm(student.id, 'term2', e.target.value)} />
                           </TableCell>
                           <TableCell className="bg-accent/10 text-center font-bold text-sm text-primary">
                             {average.toFixed(1)}
@@ -282,13 +291,15 @@ export default function ScoreEntryPage() {
                         </>
                       )}
 
-                      <TableCell>
-                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                          displayGrade === 'A1' ? 'bg-success/20 text-success' :
-                          displayGrade === 'F9' ? 'bg-destructive/20 text-destructive' :
-                          'bg-secondary text-secondary-foreground'
-                        }`}>{displayGrade}</span>
-                      </TableCell>
+                      {!isJSS && (
+                        <TableCell>
+                          <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                            displayGrade === 'A1' ? 'bg-success/20 text-success' :
+                            displayGrade === 'F9' ? 'bg-destructive/20 text-destructive' :
+                            'bg-secondary text-secondary-foreground'
+                          }`}>{displayGrade}</span>
+                        </TableCell>
+                      )}
                       <TableCell>
                         <Textarea className="min-h-[32px] text-xs resize-none" rows={1}
                           value={s.subject_comment ?? ''} onChange={e => updateLocal(student.id, 'subject_comment', e.target.value)} />
