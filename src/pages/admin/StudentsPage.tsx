@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { CLASSES } from "@/lib/constants";
 
 export default function StudentsPage() {
@@ -19,6 +20,7 @@ export default function StudentsPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ full_name: '', gender: 'Male', date_of_birth: '', class: 'JSS1' });
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const fetchStudents = async () => {
     let query = supabase.from('students').select('*').order('full_name');
@@ -50,6 +52,15 @@ export default function StudentsPage() {
     toast.success("Student added successfully!");
     setOpen(false);
     setForm({ full_name: '', gender: 'Male', date_of_birth: '', class: 'JSS1' });
+    fetchStudents();
+  };
+
+  const handleDelete = async (studentId: string) => {
+    setDeleting(studentId);
+    const { error } = await supabase.from('students').delete().eq('id', studentId);
+    setDeleting(null);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Student deleted successfully");
     fetchStudents();
   };
 
@@ -114,17 +125,44 @@ export default function StudentsPage() {
                 <TableHead>Gender</TableHead>
                 <TableHead>Class</TableHead>
                 <TableHead>DOB</TableHead>
+                <TableHead className="w-16"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No students found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No students found</TableCell></TableRow>
               ) : filtered.map(s => (
                 <TableRow key={s.id}>
                   <TableCell className="font-medium">{s.full_name}</TableCell>
                   <TableCell>{s.gender}</TableCell>
                   <TableCell><span className="px-2 py-0.5 bg-secondary rounded text-xs font-medium">{s.class}</span></TableCell>
                   <TableCell className="text-muted-foreground text-sm">{s.date_of_birth || '—'}</TableCell>
+                  <TableCell>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" disabled={deleting === s.id}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Student</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete <strong>{s.full_name}</strong>? This will also remove all their scores and reports. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => handleDelete(s.id)}
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

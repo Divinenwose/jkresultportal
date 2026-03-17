@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, RefreshCw } from "lucide-react";
 import { CLASSES } from "@/lib/constants";
 
 export default function TeachersPage() {
@@ -18,6 +19,8 @@ export default function TeachersPage() {
   const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
   const [assignForm, setAssignForm] = useState({ subject_id: '', class: 'JSS1' });
   const [assigning, setAssigning] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [reassigning, setReassigning] = useState<string | null>(null);
 
   const fetchAll = async () => {
     const { data: roles } = await supabase.from('user_roles').select('user_id').eq('role', 'teacher');
@@ -50,7 +53,6 @@ export default function TeachersPage() {
     if (!assignForm.subject_id) { toast.error("Please select a subject"); return; }
     setAssigning(true);
 
-    // Check if already assigned
     const existing = selectedTeacher.assignments.find(
       (a: any) => a.subject_id === assignForm.subject_id && a.class === assignForm.class
     );
@@ -68,10 +70,45 @@ export default function TeachersPage() {
     fetchAll();
   };
 
-  const handleRemove = async (assignmentId: string) => {
+  const handleRemoveAssignment = async (assignmentId: string) => {
     const { error } = await supabase.from('teacher_assignments').delete().eq('id', assignmentId);
     if (error) { toast.error(error.message); return; }
     toast.success("Assignment removed");
+    fetchAll();
+  };
+
+  // Reassign: clear all assignments then open assign dialog
+  const handleReassign = async (teacher: any) => {
+    setReassigning(teacher.user_id);
+    if (teacher.assignments.length > 0) {
+      const ids = teacher.assignments.map((a: any) => a.id);
+      for (const id of ids) {
+        await supabase.from('teacher_assignments').delete().eq('id', id);
+      }
+    }
+    setReassigning(null);
+    toast.success("Previous assignments cleared");
+    await fetchAll();
+    // Re-fetch teacher with cleared assignments then open dialog
+    setSelectedTeacher({ ...teacher, assignments: [] });
+    setAssignForm({ subject_id: '', class: 'JSS1' });
+    setAssignOpen(true);
+  };
+
+  // Delete teacher role (removes from user_roles, doesn't delete user account)
+  const handleDeleteTeacher = async (teacher: any) => {
+    setDeleting(teacher.user_id);
+    // Remove all assignments first
+    if (teacher.assignments.length > 0) {
+      for (const a of teacher.assignments) {
+        await supabase.from('teacher_assignments').delete().eq('id', a.id);
+      }
+    }
+    // Remove teacher role
+    const { error } = await supabase.from('user_roles').delete().eq('user_id', teacher.user_id).eq('role', 'teacher');
+    setDeleting(null);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`${teacher.full_name} removed as teacher`);
     fetchAll();
   };
 
@@ -87,7 +124,7 @@ export default function TeachersPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Assigned Subjects</TableHead>
-                <TableHead className="w-24">Action</TableHead>
+                <TableHead className="w-36 text-right pr-4">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -102,7 +139,7 @@ export default function TeachersPage() {
                       {t.assignments.map((a: any) => (
                         <span key={a.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-secondary rounded text-[10px] font-medium">
                           {a.subjects?.name} ({a.class})
-                          <button onClick={() => handleRemove(a.id)} className="text-muted-foreground hover:text-destructive ml-0.5">
+                          <button onClick={() => handleRemoveAssignment(a.id)} className="text-muted-foreground hover:text-destructive ml-0.5">
                             <Trash2 className="h-2.5 w-2.5" />
                           </button>
                         </span>
@@ -111,9 +148,59 @@ export default function TeachersPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Button size="sm" variant="outline" onClick={() => openAssign(t)}>
-                      <Plus className="h-3 w-3 mr-1" /> Assign
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      {/* Add subject assignment */}
+                      <Button size="sm" variant="outline" onClick={() => openAssign(t)} title="Add assignment">
+                        <Plus className="h-3 w-3 mr-1" /> Assign
+                      </Button>
+
+                      {/* Reassign (clear all + open assign) */}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-primary" title="Reassign teacher" disabled={reassigning === t.user_id}>
+                            <RefreshCw className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Reassign Teacher</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will remove all current subject assignments for <strong>{t.full_name}</strong> and open the assignment form so you can assign new subjects. Continue?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleReassign(t)}>Reassign</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+
+                      {/* Delete teacher */}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Remove teacher" disabled={deleting === t.user_id}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Remove Teacher</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to remove <strong>{t.full_name}</strong> as a teacher? All their subject assignments will also be removed. Their account will still exist.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => handleDeleteTeacher(t)}
+                            >
+                              Remove
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
