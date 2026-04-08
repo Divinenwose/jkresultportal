@@ -109,7 +109,7 @@ export default function TeachersPage() {
     await fetchAll();
     // Re-fetch teacher with cleared assignments then open dialog
     setSelectedTeacher({ ...teacher, assignments: [] });
-    setAssignForm({ subject_id: '', class: 'JSS1' });
+    setAssignForm({ subject_id: '', level: 'Junior' });
     setAssignOpen(true);
   };
 
