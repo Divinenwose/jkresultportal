@@ -44,28 +44,46 @@ export default function TeachersPage() {
 
   const openAssign = (teacher: any) => {
     setSelectedTeacher(teacher);
-    setAssignForm({ subject_id: '', class: 'JSS1' });
+    setAssignForm({ subject_id: '', level: 'Junior' });
     setAssignOpen(true);
   };
+
+  const JUNIOR_CLASSES = ['JSS1', 'JSS2', 'JSS3'];
+  const SENIOR_CLASSES = ['SS1', 'SS2', 'SS3'];
 
   const handleAssign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!assignForm.subject_id) { toast.error("Please select a subject"); return; }
     setAssigning(true);
 
-    const existing = selectedTeacher.assignments.find(
-      (a: any) => a.subject_id === assignForm.subject_id && a.class === assignForm.class
-    );
-    if (existing) { toast.error("Already assigned"); setAssigning(false); return; }
+    const classesForLevel = assignForm.level === 'Junior' ? JUNIOR_CLASSES : SENIOR_CLASSES;
 
-    const { error } = await supabase.from('teacher_assignments').insert({
+    // Find the subject name to create assignments for all classes in the level
+    const selectedSubject = subjects.find(s => s.id === assignForm.subject_id);
+    if (!selectedSubject) { toast.error("Subject not found"); setAssigning(false); return; }
+
+    // Get all subject IDs with this name across the level's classes
+    const subjectIds = subjects
+      .filter(s => s.name === selectedSubject.name && classesForLevel.includes(s.class))
+      .map(s => ({ subject_id: s.id, class: s.class }));
+
+    // Filter out already assigned
+    const toInsert = subjectIds.filter(
+      s => !selectedTeacher.assignments.find((a: any) => a.subject_id === s.subject_id && a.class === s.class)
+    );
+
+    if (toInsert.length === 0) { toast.error("Already assigned to all classes"); setAssigning(false); return; }
+
+    const rows = toInsert.map(s => ({
       teacher_user_id: selectedTeacher.user_id,
-      subject_id: assignForm.subject_id,
-      class: assignForm.class as any,
-    });
+      subject_id: s.subject_id,
+      class: s.class as any,
+    }));
+
+    const { error } = await supabase.from('teacher_assignments').insert(rows);
     setAssigning(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Subject assigned!");
+    toast.success(`Subject assigned to ${classesForLevel.join(', ')}!`);
     setAssignOpen(false);
     fetchAll();
   };
