@@ -130,7 +130,10 @@ export default function TeachersPage() {
     fetchAll();
   };
 
-  const filteredSubjects = subjects.filter(s => s.class === assignForm.class);
+  // Show unique subject names for the selected level
+  const levelClasses = assignForm.level === 'Junior' ? ['JSS1', 'JSS2', 'JSS3'] : ['SS1', 'SS2', 'SS3'];
+  const filteredSubjects = subjects.filter(s => levelClasses.includes(s.class));
+  const uniqueSubjects = filteredSubjects.filter((s, i, arr) => arr.findIndex(x => x.name === s.name) === i);
 
   return (
     <DashboardLayout title="Teachers">
