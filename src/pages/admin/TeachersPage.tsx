@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Plus, Trash2, RefreshCw } from "lucide-react";
-import { CLASSES } from "@/lib/constants";
+
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<any[]>([]);
