@@ -45,10 +45,11 @@ export default function SubjectsPage() {
   };
 
   // Group subjects by name for display
-  const grouped = subjects.reduce((acc: Record<string, any[]>, s) => {
+  const grouped = subjects.reduce((acc: Record<string, any[]>, s: any) => {
     if (!acc[s.name]) acc[s.name] = [];
     acc[s.name].push(s);
     return acc;
+  }, {} as Record<string, any[]>);
   }, {});
 
   return (
