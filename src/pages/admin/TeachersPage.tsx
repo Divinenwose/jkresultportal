@@ -17,7 +17,7 @@ export default function TeachersPage() {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [assignOpen, setAssignOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
-  const [assignForm, setAssignForm] = useState({ subject_id: '', class: 'JSS1' });
+  const [assignForm, setAssignForm] = useState({ subject_id: '', level: 'Junior' });
   const [assigning, setAssigning] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [reassigning, setReassigning] = useState<string | null>(null);
