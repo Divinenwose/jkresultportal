@@ -45,13 +45,20 @@ export default function SubjectsPage() {
     fetchSubjects();
   };
 
+  const handleDeleteSubject = async (name: string) => {
+    const ids = subjects.filter(s => s.name === name).map(s => s.id);
+    const { error } = await supabase.from('subjects').delete().in('id', ids);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`"${name}" deleted from all classes`);
+    fetchSubjects();
+  };
+
   // Group subjects by name for display
   const grouped = subjects.reduce((acc: Record<string, any[]>, s: any) => {
     if (!acc[s.name]) acc[s.name] = [];
     acc[s.name].push(s);
     return acc;
   }, {} as Record<string, any[]>);
-  
 
   return (
     <DashboardLayout title="Subjects">
