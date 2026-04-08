@@ -50,7 +50,7 @@ export default function SubjectsPage() {
     acc[s.name].push(s);
     return acc;
   }, {} as Record<string, any[]>);
-  }, {});
+  
 
   return (
     <DashboardLayout title="Subjects">
