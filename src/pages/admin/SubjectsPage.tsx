@@ -94,7 +94,7 @@ export default function SubjectsPage() {
                   <TableCell className="font-medium">{name}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {items.map(s => (
+                      {(items as any[]).map((s: any) => (
                         <span key={s.id} className="px-2 py-0.5 bg-secondary rounded text-xs font-medium">{s.class}</span>
                       ))}
                     </div>
