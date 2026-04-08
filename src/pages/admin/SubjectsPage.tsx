@@ -97,7 +97,7 @@ export default function SubjectsPage() {
             </TableHeader>
             <TableBody>
               {Object.keys(grouped).length === 0 ? (
-                <TableRow><TableCell colSpan={2} className="text-center py-8 text-muted-foreground">No subjects yet</TableCell></TableRow>
+                <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No subjects yet</TableCell></TableRow>
               ) : Object.entries(grouped).map(([name, items]) => (
                 <TableRow key={name}>
                   <TableCell className="font-medium">{name}</TableCell>
@@ -107,6 +107,23 @@ export default function SubjectsPage() {
                         <span key={s.id} className="px-2 py-0.5 bg-secondary rounded text-xs font-medium">{s.class}</span>
                       ))}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete "{name}"?</AlertDialogTitle>
+                          <AlertDialogDescription>This will remove the subject from all classes. This action cannot be undone.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDeleteSubject(name)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </TableCell>
                 </TableRow>
               ))}
