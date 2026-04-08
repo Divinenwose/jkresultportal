@@ -92,6 +92,7 @@ export default function SubjectsPage() {
               <TableRow>
                 <TableHead>Subject</TableHead>
                 <TableHead>Classes</TableHead>
+                <TableHead className="w-16"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
