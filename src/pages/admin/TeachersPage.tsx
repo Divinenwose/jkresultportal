@@ -238,10 +238,13 @@ export default function TeachersPage() {
           <form onSubmit={handleAssign} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Class</Label>
-                <Select value={assignForm.class} onValueChange={v => setAssignForm({ ...assignForm, class: v, subject_id: '' })}>
+                <Label>Level</Label>
+                <Select value={assignForm.level} onValueChange={v => setAssignForm({ ...assignForm, level: v, subject_id: '' })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{CLASSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    <SelectItem value="Junior">Junior (JSS1-3)</SelectItem>
+                    <SelectItem value="Senior">Senior (SS1-3)</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
               <div>
@@ -249,9 +252,9 @@ export default function TeachersPage() {
                 <Select value={assignForm.subject_id} onValueChange={v => setAssignForm({ ...assignForm, subject_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
                   <SelectContent>
-                    {filteredSubjects.length === 0
-                      ? <SelectItem value="_none" disabled>No subjects for {assignForm.class}</SelectItem>
-                      : filteredSubjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)
+                    {uniqueSubjects.length === 0
+                      ? <SelectItem value="_none" disabled>No subjects for {assignForm.level}</SelectItem>
+                      : uniqueSubjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)
                     }
                   </SelectContent>
                 </Select>
