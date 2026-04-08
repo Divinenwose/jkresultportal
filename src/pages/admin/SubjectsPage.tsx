@@ -9,7 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 const JUNIOR_CLASSES = ['JSS1', 'JSS2', 'JSS3'] as const;
 const SENIOR_CLASSES = ['SS1', 'SS2', 'SS3'] as const;
@@ -44,13 +45,20 @@ export default function SubjectsPage() {
     fetchSubjects();
   };
 
+  const handleDeleteSubject = async (name: string) => {
+    const ids = subjects.filter(s => s.name === name).map(s => s.id);
+    const { error } = await supabase.from('subjects').delete().in('id', ids);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`"${name}" deleted from all classes`);
+    fetchSubjects();
+  };
+
   // Group subjects by name for display
   const grouped = subjects.reduce((acc: Record<string, any[]>, s: any) => {
     if (!acc[s.name]) acc[s.name] = [];
     acc[s.name].push(s);
     return acc;
   }, {} as Record<string, any[]>);
-  
 
   return (
     <DashboardLayout title="Subjects">
@@ -84,11 +92,12 @@ export default function SubjectsPage() {
               <TableRow>
                 <TableHead>Subject</TableHead>
                 <TableHead>Classes</TableHead>
+                <TableHead className="w-16"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {Object.keys(grouped).length === 0 ? (
-                <TableRow><TableCell colSpan={2} className="text-center py-8 text-muted-foreground">No subjects yet</TableCell></TableRow>
+                <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No subjects yet</TableCell></TableRow>
               ) : Object.entries(grouped).map(([name, items]) => (
                 <TableRow key={name}>
                   <TableCell className="font-medium">{name}</TableCell>
@@ -98,6 +107,23 @@ export default function SubjectsPage() {
                         <span key={s.id} className="px-2 py-0.5 bg-secondary rounded text-xs font-medium">{s.class}</span>
                       ))}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete "{name}"?</AlertDialogTitle>
+                          <AlertDialogDescription>This will remove the subject from all classes. This action cannot be undone.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDeleteSubject(name)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </TableCell>
                 </TableRow>
               ))}
