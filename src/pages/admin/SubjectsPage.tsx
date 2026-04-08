@@ -10,12 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
-import { CLASSES } from "@/lib/constants";
+
+const JUNIOR_CLASSES = ['JSS1', 'JSS2', 'JSS3'] as const;
+const SENIOR_CLASSES = ['SS1', 'SS2', 'SS3'] as const;
 
 export default function SubjectsPage() {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', class: 'JSS1' });
+  const [form, setForm] = useState({ name: '', level: 'Junior' as 'Junior' | 'Senior' });
   const [loading, setLoading] = useState(false);
 
   const fetchSubjects = async () => {
@@ -29,14 +31,26 @@ export default function SubjectsPage() {
     e.preventDefault();
     if (!form.name.trim()) { toast.error("Subject name is required"); return; }
     setLoading(true);
-    const { error } = await supabase.from('subjects').insert({ name: form.name.trim(), class: form.class as any });
+
+    const classes = form.level === 'Junior' ? JUNIOR_CLASSES : SENIOR_CLASSES;
+    const rows = classes.map(c => ({ name: form.name.trim(), class: c as any }));
+
+    const { error } = await supabase.from('subjects').insert(rows);
     setLoading(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Subject added!");
+    toast.success(`Subject added for all ${form.level} classes!`);
     setOpen(false);
-    setForm({ name: '', class: 'JSS1' });
+    setForm({ name: '', level: 'Junior' });
     fetchSubjects();
   };
+
+  // Group subjects by name for display
+  const grouped = subjects.reduce((acc: Record<string, any[]>, s: any) => {
+    if (!acc[s.name]) acc[s.name] = [];
+    acc[s.name].push(s);
+    return acc;
+  }, {} as Record<string, any[]>);
+  
 
   return (
     <DashboardLayout title="Subjects">
@@ -48,10 +62,13 @@ export default function SubjectsPage() {
             <form onSubmit={handleAdd} className="space-y-4">
               <div><Label>Subject Name</Label><Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} required /></div>
               <div>
-                <Label>Class</Label>
-                <Select value={form.class} onValueChange={v => setForm({...form, class: v})}>
+                <Label>Level</Label>
+                <Select value={form.level} onValueChange={(v: 'Junior' | 'Senior') => setForm({...form, level: v})}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{CLASSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    <SelectItem value="Junior">Junior (JSS1–JSS3)</SelectItem>
+                    <SelectItem value="Senior">Senior (SS1–SS3)</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
               <Button type="submit" className="w-full" disabled={loading}>{loading ? "Adding..." : "Add Subject"}</Button>
@@ -66,16 +83,22 @@ export default function SubjectsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Subject</TableHead>
-                <TableHead>Class</TableHead>
+                <TableHead>Classes</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {subjects.length === 0 ? (
+              {Object.keys(grouped).length === 0 ? (
                 <TableRow><TableCell colSpan={2} className="text-center py-8 text-muted-foreground">No subjects yet</TableCell></TableRow>
-              ) : subjects.map(s => (
-                <TableRow key={s.id}>
-                  <TableCell className="font-medium">{s.name}</TableCell>
-                  <TableCell><span className="px-2 py-0.5 bg-secondary rounded text-xs font-medium">{s.class}</span></TableCell>
+              ) : Object.entries(grouped).map(([name, items]) => (
+                <TableRow key={name}>
+                  <TableCell className="font-medium">{name}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {(items as any[]).map((s: any) => (
+                        <span key={s.id} className="px-2 py-0.5 bg-secondary rounded text-xs font-medium">{s.class}</span>
+                      ))}
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

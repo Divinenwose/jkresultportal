@@ -215,24 +215,26 @@ export default function TeachersPage() {
             <DialogTitle className="font-display">Assign Subject to {selectedTeacher?.full_name}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleAssign} className="space-y-4">
-            <div>
-              <Label>Class</Label>
-              <Select value={assignForm.class} onValueChange={v => setAssignForm({ ...assignForm, class: v, subject_id: '' })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{CLASSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Subject</Label>
-              <Select value={assignForm.subject_id} onValueChange={v => setAssignForm({ ...assignForm, subject_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
-                <SelectContent>
-                  {filteredSubjects.length === 0
-                    ? <SelectItem value="_none" disabled>No subjects for {assignForm.class}</SelectItem>
-                    : filteredSubjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)
-                  }
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Class</Label>
+                <Select value={assignForm.class} onValueChange={v => setAssignForm({ ...assignForm, class: v, subject_id: '' })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{CLASSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Subject</Label>
+                <Select value={assignForm.subject_id} onValueChange={v => setAssignForm({ ...assignForm, subject_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
+                  <SelectContent>
+                    {filteredSubjects.length === 0
+                      ? <SelectItem value="_none" disabled>No subjects for {assignForm.class}</SelectItem>
+                      : filteredSubjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)
+                    }
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <Button type="submit" className="w-full" disabled={assigning}>{assigning ? "Assigning..." : "Assign Subject"}</Button>
           </form>
