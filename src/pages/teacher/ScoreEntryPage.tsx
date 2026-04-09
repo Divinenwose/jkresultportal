@@ -17,7 +17,8 @@ function autoComment(total: number): string {
   if (total >= 65) return 'Good';
   if (total >= 50) return 'Credit';
   if (total >= 40) return 'Pass';
-  return 'Fail';
+  if (total > 0) return 'Fail';
+  return '';
 }
 import { useSettings } from "@/hooks/useSettings";
 import { Save } from "lucide-react";
