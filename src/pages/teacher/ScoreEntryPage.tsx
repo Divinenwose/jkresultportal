@@ -117,26 +117,49 @@ export default function ScoreEntryPage() {
     return String(Math.min(Math.max(0, num), max));
   };
 
+  const computeCommentScore = (studentId: string, scoreData: any) => {
+    const total = (Number(scoreData.first_test) || 0) + (Number(scoreData.second_test) || 0) + (Number(scoreData.exam) || 0);
+    const prev = prevTermScores[studentId] || {};
+    const term1Val = prev.term1 ?? 0;
+    const term2Val = prev.term2 ?? 0;
+    if (isThirdTerm) return (total + Number(term1Val) + Number(term2Val)) / 3;
+    if (isSecondTerm) return (total + Number(term1Val)) / 2;
+    return total;
+  };
+
   const updateLocal = (studentId: string, field: string, value: string) => {
     const maxMap: Record<string, number> = { first_test: 20, second_test: 20, exam: 60 };
     const clamped = maxMap[field] ? clampValue(value, maxMap[field]) : value;
 
     setScoreMap(prev => {
       const updated = { ...prev, [studentId]: { ...prev[studentId], [field]: clamped } };
-      // Auto-generate comment based on total
       const s = updated[studentId];
-      const total = (Number(s.first_test) || 0) + (Number(s.second_test) || 0) + (Number(s.exam) || 0);
-      updated[studentId] = { ...updated[studentId], subject_comment: autoComment(total) };
+      const avg = computeCommentScore(studentId, s);
+      updated[studentId] = { ...updated[studentId], subject_comment: autoComment(avg) };
       return updated;
     });
   };
 
   const updatePrevTerm = (studentId: string, termKey: 'term1' | 'term2', value: string) => {
     const clamped = clampValue(value, 100);
-    setPrevTermScores(prev => ({
-      ...prev,
-      [studentId]: { ...prev[studentId], [termKey]: clamped === '' ? 0 : Number(clamped) }
-    }));
+    setPrevTermScores(prev => {
+      const updatedPrev = {
+        ...prev,
+        [studentId]: { ...prev[studentId], [termKey]: clamped === '' ? 0 : Number(clamped) }
+      };
+      // Recompute comment with new prev term values
+      const s = scoreMap[studentId] || {};
+      const total = (Number(s.first_test) || 0) + (Number(s.second_test) || 0) + (Number(s.exam) || 0);
+      const p = updatedPrev[studentId] || {};
+      let avg = total;
+      if (isThirdTerm) avg = (total + Number(p.term1 ?? 0) + Number(p.term2 ?? 0)) / 3;
+      else if (isSecondTerm) avg = (total + Number(p.term1 ?? 0)) / 2;
+      setScoreMap(sm => ({
+        ...sm,
+        [studentId]: { ...sm[studentId], subject_comment: autoComment(avg) }
+      }));
+      return updatedPrev;
+    });
   };
 
   const handleSaveAll = async () => {
