@@ -142,10 +142,24 @@ export default function ScoreEntryPage() {
 
   const updatePrevTerm = (studentId: string, termKey: 'term1' | 'term2', value: string) => {
     const clamped = clampValue(value, 100);
-    setPrevTermScores(prev => ({
-      ...prev,
-      [studentId]: { ...prev[studentId], [termKey]: clamped === '' ? 0 : Number(clamped) }
-    }));
+    setPrevTermScores(prev => {
+      const updatedPrev = {
+        ...prev,
+        [studentId]: { ...prev[studentId], [termKey]: clamped === '' ? 0 : Number(clamped) }
+      };
+      // Recompute comment with new prev term values
+      const s = scoreMap[studentId] || {};
+      const total = (Number(s.first_test) || 0) + (Number(s.second_test) || 0) + (Number(s.exam) || 0);
+      const p = updatedPrev[studentId] || {};
+      let avg = total;
+      if (isThirdTerm) avg = (total + Number(p.term1 ?? 0) + Number(p.term2 ?? 0)) / 3;
+      else if (isSecondTerm) avg = (total + Number(p.term1 ?? 0)) / 2;
+      setScoreMap(sm => ({
+        ...sm,
+        [studentId]: { ...sm[studentId], subject_comment: autoComment(avg) }
+      }));
+      return updatedPrev;
+    });
   };
 
   const handleSaveAll = async () => {
