@@ -120,10 +120,18 @@ export default function ScoreEntryPage() {
   const computeCommentScore = (studentId: string, scoreData: any) => {
     const total = (Number(scoreData.first_test) || 0) + (Number(scoreData.second_test) || 0) + (Number(scoreData.exam) || 0);
     const prev = prevTermScores[studentId] || {};
-    const term1Val = prev.term1 ?? 0;
-    const term2Val = prev.term2 ?? 0;
-    if (isThirdTerm) return (total + Number(term1Val) + Number(term2Val)) / 3;
-    if (isSecondTerm) return (total + Number(term1Val)) / 2;
+    const term1Val = Number(prev.term1 ?? 0);
+    const term2Val = Number(prev.term2 ?? 0);
+    if (isThirdTerm) {
+      const terms = [total, term1Val, term2Val];
+      const nonZeroCount = terms.filter(t => t > 0).length || 1;
+      return terms.reduce((a, b) => a + b, 0) / nonZeroCount;
+    }
+    if (isSecondTerm) {
+      const terms = [total, term1Val];
+      const nonZeroCount = terms.filter(t => t > 0).length || 1;
+      return terms.reduce((a, b) => a + b, 0) / nonZeroCount;
+    }
     return total;
   };
 
@@ -152,8 +160,15 @@ export default function ScoreEntryPage() {
       const total = (Number(s.first_test) || 0) + (Number(s.second_test) || 0) + (Number(s.exam) || 0);
       const p = updatedPrev[studentId] || {};
       let avg = total;
-      if (isThirdTerm) avg = (total + Number(p.term1 ?? 0) + Number(p.term2 ?? 0)) / 3;
-      else if (isSecondTerm) avg = (total + Number(p.term1 ?? 0)) / 2;
+      if (isThirdTerm) {
+        const terms = [total, Number(p.term1 ?? 0), Number(p.term2 ?? 0)];
+        const nonZeroCount = terms.filter(t => t > 0).length || 1;
+        avg = terms.reduce((a, b) => a + b, 0) / nonZeroCount;
+      } else if (isSecondTerm) {
+        const terms = [total, Number(p.term1 ?? 0)];
+        const nonZeroCount = terms.filter(t => t > 0).length || 1;
+        avg = terms.reduce((a, b) => a + b, 0) / nonZeroCount;
+      }
       setScoreMap(sm => ({
         ...sm,
         [studentId]: { ...sm[studentId], subject_comment: autoComment(avg) }
@@ -288,9 +303,13 @@ export default function ScoreEntryPage() {
 
                   let average = total;
                   if (isSecondTerm) {
-                    average = (total + term1Val) / 2;
+                    const terms = [total, term1Val];
+                    const nonZeroCount = terms.filter(t => t > 0).length || 1;
+                    average = terms.reduce((a, b) => a + b, 0) / nonZeroCount;
                   } else if (isThirdTerm) {
-                    average = (total + term1Val + term2Val) / 3;
+                    const terms = [total, term1Val, term2Val];
+                    const nonZeroCount = terms.filter(t => t > 0).length || 1;
+                    average = terms.reduce((a, b) => a + b, 0) / nonZeroCount;
                   }
 
                   const displayGrade = calculateGrade(average);
