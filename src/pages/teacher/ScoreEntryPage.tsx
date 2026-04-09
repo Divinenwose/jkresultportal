@@ -10,6 +10,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { calculateGrade } from "@/lib/constants";
+
+function autoComment(total: number): string {
+  if (total >= 75) return 'Excellent';
+  if (total >= 70) return 'Very Good';
+  if (total >= 65) return 'Good';
+  if (total >= 50) return 'Credit';
+  if (total >= 40) return 'Pass';
+  return 'Fail';
+}
 import { useSettings } from "@/hooks/useSettings";
 import { Save } from "lucide-react";
 
@@ -100,11 +109,25 @@ export default function ScoreEntryPage() {
     fetch();
   }, [selectedAssignment, assignments, settings, isSecondTerm, isThirdTerm]);
 
+  const clampValue = (value: string, max: number): string => {
+    if (value === '') return '';
+    const num = Number(value);
+    if (isNaN(num)) return '';
+    return String(Math.min(Math.max(0, num), max));
+  };
+
   const updateLocal = (studentId: string, field: string, value: string) => {
-    setScoreMap(prev => ({
-      ...prev,
-      [studentId]: { ...prev[studentId], [field]: value }
-    }));
+    const maxMap: Record<string, number> = { first_test: 20, second_test: 20, exam: 60 };
+    const clamped = maxMap[field] ? clampValue(value, maxMap[field]) : value;
+
+    setScoreMap(prev => {
+      const updated = { ...prev, [studentId]: { ...prev[studentId], [field]: clamped } };
+      // Auto-generate comment based on total
+      const s = updated[studentId];
+      const total = (Number(s.first_test) || 0) + (Number(s.second_test) || 0) + (Number(s.exam) || 0);
+      updated[studentId] = { ...updated[studentId], subject_comment: autoComment(total) };
+      return updated;
+    });
   };
 
   const updatePrevTerm = (studentId: string, termKey: 'term1' | 'term2', value: string) => {
