@@ -131,9 +131,10 @@ export default function ScoreEntryPage() {
   };
 
   const updatePrevTerm = (studentId: string, termKey: 'term1' | 'term2', value: string) => {
+    const clamped = clampValue(value, 100);
     setPrevTermScores(prev => ({
       ...prev,
-      [studentId]: { ...prev[studentId], [termKey]: value === '' ? 0 : Number(value) }
+      [studentId]: { ...prev[studentId], [termKey]: clamped === '' ? 0 : Number(clamped) }
     }));
   };
 
@@ -323,9 +324,8 @@ export default function ScoreEntryPage() {
                           }`}>{displayGrade}</span>
                         </TableCell>
                       )}
-                      <TableCell>
-                        <Textarea className="min-h-[32px] text-xs resize-none" rows={1}
-                          value={s.subject_comment ?? ''} onChange={e => updateLocal(student.id, 'subject_comment', e.target.value)} />
+                      <TableCell className="text-xs font-medium">
+                        {s.subject_comment || autoComment(total)}
                       </TableCell>
                     </TableRow>
                   );
