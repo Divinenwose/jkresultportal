@@ -293,7 +293,7 @@ export default function ScoreEntryPage() {
                     average = (total + term1Val + term2Val) / 3;
                   }
 
-                  const displayGrade = showCumulative ? calculateGrade(average) : calculateGrade(total);
+                  const displayGrade = calculateGrade(average);
 
                   return (
                     <TableRow key={student.id}>
