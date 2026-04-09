@@ -117,16 +117,25 @@ export default function ScoreEntryPage() {
     return String(Math.min(Math.max(0, num), max));
   };
 
+  const computeCommentScore = (studentId: string, scoreData: any) => {
+    const total = (Number(scoreData.first_test) || 0) + (Number(scoreData.second_test) || 0) + (Number(scoreData.exam) || 0);
+    const prev = prevTermScores[studentId] || {};
+    const term1Val = prev.term1 ?? 0;
+    const term2Val = prev.term2 ?? 0;
+    if (isThirdTerm) return (total + Number(term1Val) + Number(term2Val)) / 3;
+    if (isSecondTerm) return (total + Number(term1Val)) / 2;
+    return total;
+  };
+
   const updateLocal = (studentId: string, field: string, value: string) => {
     const maxMap: Record<string, number> = { first_test: 20, second_test: 20, exam: 60 };
     const clamped = maxMap[field] ? clampValue(value, maxMap[field]) : value;
 
     setScoreMap(prev => {
       const updated = { ...prev, [studentId]: { ...prev[studentId], [field]: clamped } };
-      // Auto-generate comment based on total
       const s = updated[studentId];
-      const total = (Number(s.first_test) || 0) + (Number(s.second_test) || 0) + (Number(s.exam) || 0);
-      updated[studentId] = { ...updated[studentId], subject_comment: autoComment(total) };
+      const avg = computeCommentScore(studentId, s);
+      updated[studentId] = { ...updated[studentId], subject_comment: autoComment(avg) };
       return updated;
     });
   };
