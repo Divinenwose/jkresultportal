@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2, Pencil } from "lucide-react";
 import { CLASSES } from "@/lib/constants";
 
 export default function StudentsPage() {
@@ -21,6 +21,12 @@ export default function StudentsPage() {
   const [form, setForm] = useState({ full_name: '', gender: 'Male', date_of_birth: '', class: 'JSS1' });
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  // Edit state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: '', gender: 'Male', date_of_birth: '', class: 'JSS1' });
+  const [editLoading, setEditLoading] = useState(false);
 
   const fetchStudents = async () => {
     let query = supabase.from('students').select('*').order('full_name');
@@ -52,6 +58,36 @@ export default function StudentsPage() {
     toast.success("Student added successfully!");
     setOpen(false);
     setForm({ full_name: '', gender: 'Male', date_of_birth: '', class: 'JSS1' });
+    fetchStudents();
+  };
+
+  const openEdit = (student: any) => {
+    setEditId(student.id);
+    setEditForm({
+      full_name: student.full_name,
+      gender: student.gender,
+      date_of_birth: student.date_of_birth || '',
+      class: student.class,
+    });
+    setEditOpen(true);
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm.full_name.trim()) { toast.error("Name is required"); return; }
+    setEditLoading(true);
+
+    const { error } = await supabase.from('students').update({
+      full_name: editForm.full_name.trim(),
+      gender: editForm.gender,
+      date_of_birth: editForm.date_of_birth || null,
+      class: editForm.class as any,
+    }).eq('id', editId!);
+
+    setEditLoading(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Student updated successfully!");
+    setEditOpen(false);
     fetchStudents();
   };
 
@@ -116,6 +152,37 @@ export default function StudentsPage() {
         </Dialog>
       </div>
 
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="font-display">Edit Student</DialogTitle></DialogHeader>
+          <form onSubmit={handleEdit} className="space-y-4">
+            <div><Label>Full Name</Label><Input value={editForm.full_name} onChange={e => setEditForm({...editForm, full_name: e.target.value})} required /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Gender</Label>
+                <Select value={editForm.gender} onValueChange={v => setEditForm({...editForm, gender: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Male">Male</SelectItem>
+                    <SelectItem value="Female">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Class</Label>
+                <Select value={editForm.class} onValueChange={v => setEditForm({...editForm, class: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{CLASSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div><Label>Date of Birth</Label><Input type="date" value={editForm.date_of_birth} onChange={e => setEditForm({...editForm, date_of_birth: e.target.value})} /></div>
+            <Button type="submit" className="w-full" disabled={editLoading}>{editLoading ? "Saving..." : "Save Changes"}</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -125,7 +192,7 @@ export default function StudentsPage() {
                 <TableHead>Gender</TableHead>
                 <TableHead>Class</TableHead>
                 <TableHead>DOB</TableHead>
-                <TableHead className="w-16"></TableHead>
+                <TableHead className="w-24"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -138,30 +205,35 @@ export default function StudentsPage() {
                   <TableCell><span className="px-2 py-0.5 bg-secondary rounded text-xs font-medium">{s.class}</span></TableCell>
                   <TableCell className="text-muted-foreground text-sm">{s.date_of_birth || '—'}</TableCell>
                   <TableCell>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" disabled={deleting === s.id}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Student</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete <strong>{s.full_name}</strong>? This will also remove all their scores and reports. This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            onClick={() => handleDelete(s.id)}
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => openEdit(s)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" disabled={deleting === s.id}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Student</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete <strong>{s.full_name}</strong>? This will also remove all their scores and reports. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => handleDelete(s.id)}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
