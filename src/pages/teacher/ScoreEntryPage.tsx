@@ -231,6 +231,10 @@ export default function ScoreEntryPage() {
     if (!assignment) return;
     setSaving(true);
 
+    // Clear any pending auto-save timers
+    Object.values(autoSaveTimers.current).forEach(clearTimeout);
+    autoSaveTimers.current = {};
+
     for (const student of students) {
       const s = scoreMap[student.id];
       if (!s) continue;
@@ -239,11 +243,7 @@ export default function ScoreEntryPage() {
       const second = Number(s.second_test) || 0;
       const exam = Number(s.exam) || 0;
 
-      const upsertData = {
-        student_id: student.id,
-        subject_id: assignment.subjects.id,
-        term: settings.active_term as any,
-        session: settings.active_session,
+      const saveData = {
         first_test: first,
         second_test: second,
         exam: exam,
@@ -252,15 +252,15 @@ export default function ScoreEntryPage() {
       };
 
       if (s.id) {
-        await supabase.from('scores').update({
-          first_test: first,
-          second_test: second,
-          exam: exam,
-          subject_comment: s.subject_comment || null,
-          submitted: true,
-        }).eq('id', s.id);
+        await supabase.from('scores').update(saveData).eq('id', s.id);
       } else {
-        await supabase.from('scores').insert(upsertData);
+        await supabase.from('scores').insert({
+          ...saveData,
+          student_id: student.id,
+          subject_id: assignment.subjects.id,
+          term: settings.active_term as any,
+          session: settings.active_session,
+        });
       }
     }
 
