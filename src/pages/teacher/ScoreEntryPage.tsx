@@ -368,7 +368,13 @@ export default function ScoreEntryPage() {
 
                   return (
                     <TableRow key={student.id}>
-                      <TableCell className="font-medium text-sm">{student.full_name}</TableCell>
+                      <TableCell className="font-medium text-sm">
+                        <div className="flex items-center gap-1">
+                          {student.full_name}
+                          {autoSaveStatus[student.id] === 'saving' && <span className="text-[10px] text-muted-foreground animate-pulse">saving...</span>}
+                          {autoSaveStatus[student.id] === 'saved' && <Check className="h-3 w-3 text-green-500" />}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Input type="number" min={0} max={20} className="h-8 text-sm w-16"
                           value={s.first_test ?? ''} onChange={e => updateLocal(student.id, 'first_test', e.target.value)} />
