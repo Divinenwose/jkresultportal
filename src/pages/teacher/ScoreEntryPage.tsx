@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +21,7 @@ function autoComment(total: number): string {
   return '';
 }
 import { useSettings } from "@/hooks/useSettings";
-import { Save } from "lucide-react";
+import { Save, Check } from "lucide-react";
 
 export default function ScoreEntryPage() {
   const { user } = useAuth();
