@@ -137,6 +137,52 @@ export default function ScoreEntryPage() {
     return total;
   };
 
+  const autoSaveStudent = useCallback(async (studentId: string, scoreData: any) => {
+    const assignment = assignments.find(a => a.id === selectedAssignment);
+    if (!assignment) return;
+
+    const first = Number(scoreData.first_test) || 0;
+    const second = Number(scoreData.second_test) || 0;
+    const exam = Number(scoreData.exam) || 0;
+
+    setAutoSaveStatus(prev => ({ ...prev, [studentId]: 'saving' }));
+
+    const saveData = {
+      first_test: first,
+      second_test: second,
+      exam: exam,
+      subject_comment: scoreData.subject_comment || null,
+      submitted: false,
+    };
+
+    if (scoreData.id) {
+      await supabase.from('scores').update(saveData).eq('id', scoreData.id);
+    } else {
+      const { data } = await supabase.from('scores').insert({
+        ...saveData,
+        student_id: studentId,
+        subject_id: assignment.subjects.id,
+        term: settings.active_term as any,
+        session: settings.active_session,
+      }).select().single();
+      if (data) {
+        setScoreMap(prev => ({ ...prev, [studentId]: { ...prev[studentId], id: data.id } }));
+      }
+    }
+
+    setAutoSaveStatus(prev => ({ ...prev, [studentId]: 'saved' }));
+    setTimeout(() => setAutoSaveStatus(prev => ({ ...prev, [studentId]: '' })), 2000);
+  }, [assignments, selectedAssignment, settings]);
+
+  const scheduleAutoSave = useCallback((studentId: string, scoreData: any) => {
+    if (autoSaveTimers.current[studentId]) {
+      clearTimeout(autoSaveTimers.current[studentId]);
+    }
+    autoSaveTimers.current[studentId] = setTimeout(() => {
+      autoSaveStudent(studentId, scoreData);
+    }, 1500);
+  }, [autoSaveStudent]);
+
   const updateLocal = (studentId: string, field: string, value: string) => {
     const maxMap: Record<string, number> = { first_test: 20, second_test: 20, exam: 60 };
     const clamped = maxMap[field] ? clampValue(value, maxMap[field]) : value;
@@ -146,6 +192,7 @@ export default function ScoreEntryPage() {
       const s = updated[studentId];
       const avg = computeCommentScore(studentId, s);
       updated[studentId] = { ...updated[studentId], subject_comment: autoComment(avg) };
+      scheduleAutoSave(studentId, updated[studentId]);
       return updated;
     });
   };
