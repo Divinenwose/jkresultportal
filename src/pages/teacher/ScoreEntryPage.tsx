@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +21,7 @@ function autoComment(total: number): string {
   return '';
 }
 import { useSettings } from "@/hooks/useSettings";
-import { Save } from "lucide-react";
+import { Save, Check } from "lucide-react";
 
 export default function ScoreEntryPage() {
   const { user } = useAuth();
@@ -33,6 +33,8 @@ export default function ScoreEntryPage() {
   // Maps: studentId -> { term1Total, term2Total }
   const [prevTermScores, setPrevTermScores] = useState<Record<string, { term1?: number; term2?: number }>>({});
   const [saving, setSaving] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<Record<string, 'saving' | 'saved' | ''>>({});
+  const autoSaveTimers = useRef<Record<string, NodeJS.Timeout>>({});
 
   const activeTerm = settings.active_term;
   const isSecondTerm = activeTerm === "Second Term";
@@ -135,6 +137,52 @@ export default function ScoreEntryPage() {
     return total;
   };
 
+  const autoSaveStudent = useCallback(async (studentId: string, scoreData: any) => {
+    const assignment = assignments.find(a => a.id === selectedAssignment);
+    if (!assignment) return;
+
+    const first = Number(scoreData.first_test) || 0;
+    const second = Number(scoreData.second_test) || 0;
+    const exam = Number(scoreData.exam) || 0;
+
+    setAutoSaveStatus(prev => ({ ...prev, [studentId]: 'saving' }));
+
+    const saveData = {
+      first_test: first,
+      second_test: second,
+      exam: exam,
+      subject_comment: scoreData.subject_comment || null,
+      submitted: false,
+    };
+
+    if (scoreData.id) {
+      await supabase.from('scores').update(saveData).eq('id', scoreData.id);
+    } else {
+      const { data } = await supabase.from('scores').insert({
+        ...saveData,
+        student_id: studentId,
+        subject_id: assignment.subjects.id,
+        term: settings.active_term as any,
+        session: settings.active_session,
+      }).select().single();
+      if (data) {
+        setScoreMap(prev => ({ ...prev, [studentId]: { ...prev[studentId], id: data.id } }));
+      }
+    }
+
+    setAutoSaveStatus(prev => ({ ...prev, [studentId]: 'saved' }));
+    setTimeout(() => setAutoSaveStatus(prev => ({ ...prev, [studentId]: '' })), 2000);
+  }, [assignments, selectedAssignment, settings]);
+
+  const scheduleAutoSave = useCallback((studentId: string, scoreData: any) => {
+    if (autoSaveTimers.current[studentId]) {
+      clearTimeout(autoSaveTimers.current[studentId]);
+    }
+    autoSaveTimers.current[studentId] = setTimeout(() => {
+      autoSaveStudent(studentId, scoreData);
+    }, 1500);
+  }, [autoSaveStudent]);
+
   const updateLocal = (studentId: string, field: string, value: string) => {
     const maxMap: Record<string, number> = { first_test: 20, second_test: 20, exam: 60 };
     const clamped = maxMap[field] ? clampValue(value, maxMap[field]) : value;
@@ -144,6 +192,7 @@ export default function ScoreEntryPage() {
       const s = updated[studentId];
       const avg = computeCommentScore(studentId, s);
       updated[studentId] = { ...updated[studentId], subject_comment: autoComment(avg) };
+      scheduleAutoSave(studentId, updated[studentId]);
       return updated;
     });
   };
@@ -182,6 +231,10 @@ export default function ScoreEntryPage() {
     if (!assignment) return;
     setSaving(true);
 
+    // Clear any pending auto-save timers
+    Object.values(autoSaveTimers.current).forEach(clearTimeout);
+    autoSaveTimers.current = {};
+
     for (const student of students) {
       const s = scoreMap[student.id];
       if (!s) continue;
@@ -190,11 +243,7 @@ export default function ScoreEntryPage() {
       const second = Number(s.second_test) || 0;
       const exam = Number(s.exam) || 0;
 
-      const upsertData = {
-        student_id: student.id,
-        subject_id: assignment.subjects.id,
-        term: settings.active_term as any,
-        session: settings.active_session,
+      const saveData = {
         first_test: first,
         second_test: second,
         exam: exam,
@@ -203,15 +252,15 @@ export default function ScoreEntryPage() {
       };
 
       if (s.id) {
-        await supabase.from('scores').update({
-          first_test: first,
-          second_test: second,
-          exam: exam,
-          subject_comment: s.subject_comment || null,
-          submitted: true,
-        }).eq('id', s.id);
+        await supabase.from('scores').update(saveData).eq('id', s.id);
       } else {
-        await supabase.from('scores').insert(upsertData);
+        await supabase.from('scores').insert({
+          ...saveData,
+          student_id: student.id,
+          subject_id: assignment.subjects.id,
+          term: settings.active_term as any,
+          session: settings.active_session,
+        });
       }
     }
 
@@ -248,9 +297,12 @@ export default function ScoreEntryPage() {
           </SelectContent>
         </Select>
         {selectedAssignment && (
-          <Button onClick={handleSaveAll} disabled={saving}>
-            <Save className="h-4 w-4 mr-1" /> {saving ? "Saving..." : "Save All"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Scores auto-save as you type</span>
+            <Button onClick={handleSaveAll} disabled={saving}>
+              <Save className="h-4 w-4 mr-1" /> {saving ? "Submitting..." : "Submit All"}
+            </Button>
+          </div>
         )}
       </div>
 
@@ -316,7 +368,13 @@ export default function ScoreEntryPage() {
 
                   return (
                     <TableRow key={student.id}>
-                      <TableCell className="font-medium text-sm">{student.full_name}</TableCell>
+                      <TableCell className="font-medium text-sm">
+                        <div className="flex items-center gap-1">
+                          {student.full_name}
+                          {autoSaveStatus[student.id] === 'saving' && <span className="text-[10px] text-muted-foreground animate-pulse">saving...</span>}
+                          {autoSaveStatus[student.id] === 'saved' && <Check className="h-3 w-3 text-green-500" />}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Input type="number" min={0} max={20} className="h-8 text-sm w-16"
                           value={s.first_test ?? ''} onChange={e => updateLocal(student.id, 'first_test', e.target.value)} />
