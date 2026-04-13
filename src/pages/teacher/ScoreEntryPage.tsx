@@ -202,12 +202,44 @@ export default function ScoreEntryPage() {
     });
   };
 
+  const autoSavePrevTerm = useCallback(async (studentId: string, termKey: 'term1' | 'term2', totalValue: number) => {
+    const assignment = assignments.find(a => a.id === selectedAssignment);
+    if (!assignment) return;
+
+    const termName = termKey === 'term1' ? 'First Term' : 'Second Term';
+    const ids = prevTermIds[studentId] || {};
+    const existingId = termKey === 'term1' ? ids.term1Id : ids.term2Id;
+
+    if (existingId) {
+      await supabase.from('scores').update({ total: totalValue }).eq('id', existingId);
+    } else {
+      const { data } = await supabase.from('scores').insert({
+        student_id: studentId,
+        subject_id: assignment.subjects.id,
+        term: termName as any,
+        session: settings.active_session,
+        total: totalValue,
+        submitted: true,
+      }).select().single();
+      if (data) {
+        setPrevTermIds(prev => ({
+          ...prev,
+          [studentId]: { ...prev[studentId], [termKey === 'term1' ? 'term1Id' : 'term2Id']: data.id }
+        }));
+      }
+    }
+  }, [assignments, selectedAssignment, settings, prevTermIds]);
+
+  const prevTermTimers = useRef<Record<string, NodeJS.Timeout>>({});
+
   const updatePrevTerm = (studentId: string, termKey: 'term1' | 'term2', value: string) => {
     const clamped = clampValue(value, 100);
+    const numValue = clamped === '' ? 0 : Number(clamped);
+
     setPrevTermScores(prev => {
       const updatedPrev = {
         ...prev,
-        [studentId]: { ...prev[studentId], [termKey]: clamped === '' ? 0 : Number(clamped) }
+        [studentId]: { ...prev[studentId], [termKey]: numValue }
       };
       // Recompute comment with new prev term values
       const s = scoreMap[studentId] || {};
@@ -227,6 +259,14 @@ export default function ScoreEntryPage() {
         ...sm,
         [studentId]: { ...sm[studentId], subject_comment: autoComment(avg) }
       }));
+
+      // Auto-save prev term with debounce
+      const timerKey = `${studentId}_${termKey}`;
+      if (prevTermTimers.current[timerKey]) clearTimeout(prevTermTimers.current[timerKey]);
+      prevTermTimers.current[timerKey] = setTimeout(() => {
+        autoSavePrevTerm(studentId, termKey, numValue);
+      }, 1500);
+
       return updatedPrev;
     });
   };
