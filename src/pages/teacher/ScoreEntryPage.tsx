@@ -297,9 +297,12 @@ export default function ScoreEntryPage() {
           </SelectContent>
         </Select>
         {selectedAssignment && (
-          <Button onClick={handleSaveAll} disabled={saving}>
-            <Save className="h-4 w-4 mr-1" /> {saving ? "Saving..." : "Save All"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Scores auto-save as you type</span>
+            <Button onClick={handleSaveAll} disabled={saving}>
+              <Save className="h-4 w-4 mr-1" /> {saving ? "Submitting..." : "Submit All"}
+            </Button>
+          </div>
         )}
       </div>
 
