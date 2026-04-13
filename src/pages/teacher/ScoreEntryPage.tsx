@@ -33,6 +33,8 @@ export default function ScoreEntryPage() {
   // Maps: studentId -> { term1Total, term2Total }
   const [prevTermScores, setPrevTermScores] = useState<Record<string, { term1?: number; term2?: number }>>({});
   const [saving, setSaving] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<Record<string, 'saving' | 'saved' | ''>>({});
+  const autoSaveTimers = useRef<Record<string, NodeJS.Timeout>>({});
 
   const activeTerm = settings.active_term;
   const isSecondTerm = activeTerm === "Second Term";
