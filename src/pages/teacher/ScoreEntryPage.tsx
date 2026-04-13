@@ -79,9 +79,10 @@ export default function ScoreEntryPage() {
         // Fetch previous term scores for cumulative display
         if (isSecondTerm || isThirdTerm) {
           const prevMap: Record<string, { term1?: number; term2?: number }> = {};
+          const idMap: Record<string, { term1Id?: string; term2Id?: string }> = {};
 
           const { data: t1Scores } = await supabase.from('scores')
-            .select('student_id, total')
+            .select('id, student_id, total')
             .eq('subject_id', assignment.subjects.id)
             .eq('term', 'First Term' as any)
             .eq('session', settings.active_session)
@@ -89,11 +90,12 @@ export default function ScoreEntryPage() {
 
           (t1Scores || []).forEach(s => {
             prevMap[s.student_id] = { ...prevMap[s.student_id], term1: Number(s.total) || 0 };
+            idMap[s.student_id] = { ...idMap[s.student_id], term1Id: s.id };
           });
 
           if (isThirdTerm) {
             const { data: t2Scores } = await supabase.from('scores')
-              .select('student_id, total')
+              .select('id, student_id, total')
               .eq('subject_id', assignment.subjects.id)
               .eq('term', 'Second Term' as any)
               .eq('session', settings.active_session)
@@ -101,10 +103,12 @@ export default function ScoreEntryPage() {
 
             (t2Scores || []).forEach(s => {
               prevMap[s.student_id] = { ...prevMap[s.student_id], term2: Number(s.total) || 0 };
+              idMap[s.student_id] = { ...idMap[s.student_id], term2Id: s.id };
             });
           }
 
           setPrevTermScores(prevMap);
+          setPrevTermIds(idMap);
         } else {
           setPrevTermScores({});
         }
