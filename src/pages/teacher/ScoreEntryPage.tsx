@@ -331,6 +331,7 @@ export default function ScoreEntryPage() {
     });
 
     await Promise.all([
+      ...Array.from(inflightSaves.current),
       ...pendingCurrentStudentIds.map((studentId) => autoSaveStudent(studentId, scoreMap[studentId] || {}, false)),
       ...pendingPrevTermKeys.map((timerKey) => {
         const [studentId, termKey] = timerKey.split("::") as [string, "term1" | "term2"];
