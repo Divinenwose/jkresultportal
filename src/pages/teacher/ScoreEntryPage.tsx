@@ -430,7 +430,11 @@ export default function ScoreEntryPage() {
     if (value === selectedAssignment) return;
 
     void (async () => {
-      await flushPendingSaves();
+      if (flushPendingSavesRef.current) {
+        await flushPendingSavesRef.current();
+      }
+      // Small delay to ensure DB writes are committed before re-fetching
+      await new Promise((r) => setTimeout(r, 300));
       setSelectedAssignment(value);
     })();
   };
