@@ -308,9 +308,10 @@ export default function ScoreEntryPage() {
         delete prevTermTimers.current[timerKey];
       }
 
-      void autoSavePrevTerm(studentId, termKey, Number(prevTermScores[studentId]?.[termKey] ?? 0));
+      const p = autoSavePrevTerm(studentId, termKey, Number(prevTermScores[studentId]?.[termKey] ?? 0));
+      trackSave(p);
     },
-    [autoSavePrevTerm, prevTermScores]
+    [autoSavePrevTerm, prevTermScores, trackSave]
   );
 
   const flushPendingSavesRef = useRef<() => Promise<void>>();
