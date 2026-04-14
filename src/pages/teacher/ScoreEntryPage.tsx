@@ -40,6 +40,7 @@ export default function ScoreEntryPage() {
 
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const prevTermTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const inflightSaves = useRef<Set<Promise<void>>>(new Set());
 
   const activeTerm = settings.active_term;
   const isSecondTerm = activeTerm === "Second Term";
@@ -238,6 +239,11 @@ export default function ScoreEntryPage() {
     [assignments, calculateAverage, selectedAssignment, setSavedIndicator, settings.active_session, settings.active_term]
   );
 
+  const trackSave = useCallback((promise: Promise<void>) => {
+    inflightSaves.current.add(promise);
+    promise.finally(() => inflightSaves.current.delete(promise));
+  }, []);
+
   const scheduleAutoSave = useCallback(
     (studentId: string, scoreData: any) => {
       if (autoSaveTimers.current[studentId]) {
@@ -302,9 +308,10 @@ export default function ScoreEntryPage() {
         delete prevTermTimers.current[timerKey];
       }
 
-      void autoSavePrevTerm(studentId, termKey, Number(prevTermScores[studentId]?.[termKey] ?? 0));
+      const p = autoSavePrevTerm(studentId, termKey, Number(prevTermScores[studentId]?.[termKey] ?? 0));
+      trackSave(p);
     },
-    [autoSavePrevTerm, prevTermScores]
+    [autoSavePrevTerm, prevTermScores, trackSave]
   );
 
   const flushPendingSavesRef = useRef<() => Promise<void>>();
@@ -324,6 +331,7 @@ export default function ScoreEntryPage() {
     });
 
     await Promise.all([
+      ...Array.from(inflightSaves.current),
       ...pendingCurrentStudentIds.map((studentId) => autoSaveStudent(studentId, scoreMap[studentId] || {}, false)),
       ...pendingPrevTermKeys.map((timerKey) => {
         const [studentId, termKey] = timerKey.split("::") as [string, "term1" | "term2"];
@@ -358,10 +366,11 @@ export default function ScoreEntryPage() {
       }
       const scoreData = scoreMap[studentId];
       if (scoreData) {
-        void autoSaveStudent(studentId, scoreData, false);
+        const p = autoSaveStudent(studentId, scoreData, false);
+        trackSave(p);
       }
     },
-    [autoSaveStudent, scoreMap]
+    [autoSaveStudent, scoreMap, trackSave]
   );
 
   const updatePrevTerm = (studentId: string, termKey: "term1" | "term2", value: string) => {
