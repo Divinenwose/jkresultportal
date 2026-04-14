@@ -33,8 +33,8 @@ export default function ScoreEntryPage() {
   const [selectedAssignment, setSelectedAssignment] = useState<string>("");
   const [students, setStudents] = useState<any[]>([]);
   const [scoreMap, setScoreMap] = useState<Record<string, any>>({});
-  const [prevTermScores, setPrevTermScores] = useState<PrevTermScores>({});
-  const [prevTermIds, setPrevTermIds] = useState<PrevTermIds>({});
+  const [prevTermScores, setPrevTermScores] = useState<Record<string, PrevTermScores>>({});
+  const [prevTermIds, setPrevTermIds] = useState<Record<string, PrevTermIds>>({});
   const [saving, setSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>({});
 
@@ -59,6 +59,46 @@ export default function ScoreEntryPage() {
   }, []);
 
   useEffect(() => {
+    if (!selectedAssignment) return;
+    if (!assignments.length) return;
+
+    // re-trigger fetch logic safely
+    const assignment = assignments.find((a) => a.id === selectedAssignment);
+    if (!assignment) return;
+
+    const fetchId = ++fetchIdRef.current;
+    void (async () => {
+      const { data: studs } = await supabase
+        .from("students")
+        .select("*")
+        .eq("class", assignment.class)
+        .order("full_name");
+
+      if (fetchId !== fetchIdRef.current) return;
+
+      setStudents(studs || []);
+    })();
+  }, [assignments]);
+
+
+  useEffect(() => {
+    if (!user) {
+      setStudents([]);
+      setScoreMap({});
+      setPrevTermScores({});
+      setPrevTermIds({});
+      setSelectedAssignment("");
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    // force refresh assignments again
+    setAssignments([]);
+  }, [user]);
+
+  useEffect(() => {
     if (!user) return;
 
     supabase
@@ -68,11 +108,16 @@ export default function ScoreEntryPage() {
       .then(({ data }) => setAssignments(data || []));
   }, [user]);
 
+  const fetchIdRef = useRef(0);
+
   useEffect(() => {
-    if (!selectedAssignment) return;
+    if (!selectedAssignment || assignments.length === 0) return;
+
+    const fetchId = ++fetchIdRef.current;
 
     const assignment = assignments.find((a) => a.id === selectedAssignment);
     if (!assignment) return;
+
 
     const fetchData = async () => {
       const { data: studs } = await supabase
@@ -82,6 +127,7 @@ export default function ScoreEntryPage() {
         .order("full_name");
 
       setStudents(studs || []);
+      if (fetchId !== fetchIdRef.current) return;
 
       if (!studs?.length) return;
 
@@ -106,6 +152,7 @@ export default function ScoreEntryPage() {
         ...scoreLookup,
       }));
 
+      if (!assignment) return;
       if (isSecondTerm || isThirdTerm) {
         const prevLookup: PrevTermScores = {};
         const idLookup: PrevTermIds = {};
@@ -119,21 +166,19 @@ export default function ScoreEntryPage() {
           .eq("session", settings.active_session)
           .in("student_id", studentIds);
 
-        if (termOneScores?.length) {
-          termOneScores.forEach((score) => {
-            prevLookup[score.student_id] = {
-              ...prevLookup[score.student_id],
-              term1: Number(score.total) || 0,
-            };
+        termOneScores?.forEach((score) => {
+          prevLookup[score.student_id] = {
+            ...prevLookup[score.student_id],
+            term1: Number(score.total) || 0,
+          };
 
-            idLookup[score.student_id] = {
-              ...idLookup[score.student_id],
-              term1Id: score.id,
-            };
-          });
-        }
+          idLookup[score.student_id] = {
+            ...idLookup[score.student_id],
+            term1Id: score.id,
+          };
+        });
 
-        // SECOND TERM (only in 3rd term view)
+        // SECOND TERM (third term only)
         if (isThirdTerm) {
           const { data: termTwoScores } = await supabase
             .from("scores")
@@ -143,38 +188,49 @@ export default function ScoreEntryPage() {
             .eq("session", settings.active_session)
             .in("student_id", studentIds);
 
-          if (termTwoScores?.length) {
-            termTwoScores.forEach((score) => {
-              prevLookup[score.student_id] = {
-                ...prevLookup[score.student_id],
-                term2: Number(score.total) || 0,
-              };
+          termTwoScores?.forEach((score) => {
+            prevLookup[score.student_id] = {
+              ...prevLookup[score.student_id],
+              term2: Number(score.total) || 0,
+            };
 
-              idLookup[score.student_id] = {
-                ...idLookup[score.student_id],
-                term2Id: score.id,
-              };
-            });
-          }
+            idLookup[score.student_id] = {
+              ...idLookup[score.student_id],
+              term2Id: score.id,
+            };
+          });
         }
 
-        // ✅ CRITICAL FIX: MERGE instead of overwrite
-        setPrevTermScores((prev) => ({
-          ...prev,
-          ...prevLookup,
-        }));
+
+        setPrevTermScores((prev) => {
+          const existing = prev[selectedAssignment] || {};
+
+          return {
+            ...prev,
+            [selectedAssignment]: {
+              ...existing,
+              ...prevLookup,
+            },
+          };
+        });
 
         setPrevTermIds((prev) => ({
           ...prev,
-          ...idLookup,
+          [selectedAssignment]: idLookup,
         }));
       }
-
-
     };
 
     void fetchData();
-  }, [selectedAssignment, assignments, settings, isSecondTerm, isThirdTerm]);
+  }, [
+    selectedAssignment,
+    assignments,
+    settings.active_term,
+    settings.active_session,
+    isSecondTerm,
+    isThirdTerm,
+    user
+  ]);
 
   const clampValue = (value: string, max: number): string => {
     if (value === "") return "";
@@ -189,7 +245,10 @@ export default function ScoreEntryPage() {
         (Number(scoreData.first_test) || 0) +
         (Number(scoreData.second_test) || 0) +
         (Number(scoreData.exam) || 0);
-      const prev = prevOverride ?? prevTermScores[studentId] ?? {};
+      const prev =
+        prevOverride ??
+        prevTermScores[selectedAssignment]?.[studentId] ??
+        {};
       const term1Val = Number(prev.term1 ?? 0);
       const term2Val = Number(prev.term2 ?? 0);
 
@@ -207,7 +266,7 @@ export default function ScoreEntryPage() {
 
       return total;
     },
-    [isSecondTerm, isThirdTerm, prevTermScores]
+    [isSecondTerm, isThirdTerm, prevTermScores, selectedAssignment]
   );
 
   const setSavedIndicator = useCallback((studentId: string) => {
@@ -292,11 +351,18 @@ export default function ScoreEntryPage() {
       setAutoSaveStatus((prev) => ({ ...prev, [studentId]: "saving" }));
 
       const termName = termKey === "term1" ? "First Term" : "Second Term";
-      const ids = prevTermIds[studentId] || {};
-      const existingId = termKey === "term1" ? ids.term1Id : ids.term2Id;
+
+      const ids =
+        prevTermIds[selectedAssignment]?.[studentId] || {};
+
+      const existingId =
+        termKey === "term1" ? ids.term1Id : ids.term2Id;
 
       if (existingId) {
-        await supabase.from("scores").update({ total: totalValue }).eq("id", existingId);
+        await supabase
+          .from("scores")
+          .update({ total: totalValue })
+          .eq("id", existingId);
       } else {
         const { data } = await supabase
           .from("scores")
@@ -314,9 +380,12 @@ export default function ScoreEntryPage() {
         if (data) {
           setPrevTermIds((prev) => ({
             ...prev,
-            [studentId]: {
-              ...prev[studentId],
-              [termKey === "term1" ? "term1Id" : "term2Id"]: data.id,
+            [selectedAssignment]: {
+              ...(prev[selectedAssignment] || {}),
+              [studentId]: {
+                ...(prev[selectedAssignment]?.[studentId] || {}),
+                [termKey === "term1" ? "term1Id" : "term2Id"]: data.id,
+              },
             },
           }));
         }
@@ -335,10 +404,13 @@ export default function ScoreEntryPage() {
         delete prevTermTimers.current[timerKey];
       }
 
-      const p = autoSavePrevTerm(studentId, termKey, Number(prevTermScores[studentId]?.[termKey] ?? 0));
+      const value =
+        prevTermScores[selectedAssignment]?.[studentId]?.[termKey] ?? 0;
+
+      const p = autoSavePrevTerm(studentId, termKey, Number(value));
       trackSave(p);
     },
-    [autoSavePrevTerm, prevTermScores, trackSave]
+    [autoSavePrevTerm, prevTermScores, selectedAssignment, trackSave]
   );
 
   const flushPendingSavesRef = useRef<() => Promise<void>>();
@@ -362,7 +434,7 @@ export default function ScoreEntryPage() {
       ...pendingCurrentStudentIds.map((studentId) => autoSaveStudent(studentId, scoreMap[studentId] || {}, false)),
       ...pendingPrevTermKeys.map((timerKey) => {
         const [studentId, termKey] = timerKey.split("::") as [string, "term1" | "term2"];
-        return autoSavePrevTerm(studentId, termKey, Number(prevTermScores[studentId]?.[termKey] ?? 0));
+        return autoSavePrevTerm(studentId, termKey, Number(prevTermScores[selectedAssignment]?.[studentId]?.[termKey] ?? 0));
       }),
     ]);
   }, [autoSavePrevTerm, autoSaveStudent, prevTermScores, scoreMap]);
@@ -405,29 +477,18 @@ export default function ScoreEntryPage() {
     const numericValue = clamped === "" ? 0 : Number(clamped);
 
     setPrevTermScores((prev) => {
-      const updatedPrev = {
-        ...prev,
-        [studentId]: { ...prev[studentId], [termKey]: numericValue },
+      const updatedAssignment = {
+        ...(prev[selectedAssignment] || {}),
+        [studentId]: {
+          ...(prev[selectedAssignment]?.[studentId] || {}),
+          [termKey]: numericValue,
+        },
       };
 
-      const studentScore = scoreMap[studentId] || {};
-      const average = calculateAverage(studentId, studentScore, updatedPrev[studentId]);
-
-      setScoreMap((current) => ({
-        ...current,
-        [studentId]: { ...current[studentId], subject_comment: autoComment(average) },
-      }));
-
-      const timerKey = `${studentId}::${termKey}`;
-      if (prevTermTimers.current[timerKey]) {
-        clearTimeout(prevTermTimers.current[timerKey]);
-      }
-
-      prevTermTimers.current[timerKey] = setTimeout(() => {
-        void autoSavePrevTerm(studentId, termKey, numericValue);
-      }, 1500);
-
-      return updatedPrev;
+      return {
+        ...prev,
+        [selectedAssignment]: updatedAssignment,
+      };
     });
   };
 
@@ -553,10 +614,9 @@ export default function ScoreEntryPage() {
                   const second = Number(scoreData.second_test) || 0;
                   const exam = Number(scoreData.exam) || 0;
                   const total = first + second + exam;
-                  const prev = prevTermScores[student.id] || {};
+                  const prev = prevTermScores[selectedAssignment]?.[student.id];
                   const average = calculateAverage(student.id, scoreData);
                   const displayGrade = calculateGrade(average);
-
                   return (
                     <TableRow key={student.id}>
                       <TableCell className="font-medium text-sm">
@@ -615,7 +675,7 @@ export default function ScoreEntryPage() {
                               min={0}
                               max={100}
                               className="h-8 w-20 text-sm"
-                              value={prev.term1 ?? ""}
+                              value={prev?.term1 ?? ""}
                               onChange={(event) => updatePrevTerm(student.id, "term1", event.target.value)}
                               onBlur={() => commitPrevTermSave(student.id, "term1")}
                             />
@@ -634,7 +694,7 @@ export default function ScoreEntryPage() {
                               min={0}
                               max={100}
                               className="h-8 w-20 text-sm"
-                              value={prev.term1 ?? ""}
+                              value={prev?.term1 ?? ""}
                               onChange={(event) => updatePrevTerm(student.id, "term1", event.target.value)}
                               onBlur={() => commitPrevTermSave(student.id, "term1")}
                             />
@@ -645,7 +705,7 @@ export default function ScoreEntryPage() {
                               min={0}
                               max={100}
                               className="h-8 w-20 text-sm"
-                              value={prev.term2 ?? ""}
+                              value={prev?.term2 ?? ""}
                               onChange={(event) => updatePrevTerm(student.id, "term2", event.target.value)}
                               onBlur={() => commitPrevTermSave(student.id, "term2")}
                             />
