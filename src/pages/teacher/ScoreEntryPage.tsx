@@ -366,10 +366,11 @@ export default function ScoreEntryPage() {
       }
       const scoreData = scoreMap[studentId];
       if (scoreData) {
-        void autoSaveStudent(studentId, scoreData, false);
+        const p = autoSaveStudent(studentId, scoreData, false);
+        trackSave(p);
       }
     },
-    [autoSaveStudent, scoreMap]
+    [autoSaveStudent, scoreMap, trackSave]
   );
 
   const updatePrevTerm = (studentId: string, termKey: "term1" | "term2", value: string) => {
