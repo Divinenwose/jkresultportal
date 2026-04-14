@@ -515,6 +515,7 @@ export default function ScoreEntryPage() {
                           className="h-8 w-16 text-sm"
                           value={scoreData.first_test ?? ""}
                           onChange={(event) => updateLocal(student.id, "first_test", event.target.value)}
+                          onBlur={() => commitCurrentSave(student.id)}
                         />
                       </TableCell>
 
@@ -526,6 +527,7 @@ export default function ScoreEntryPage() {
                           className="h-8 w-16 text-sm"
                           value={scoreData.second_test ?? ""}
                           onChange={(event) => updateLocal(student.id, "second_test", event.target.value)}
+                          onBlur={() => commitCurrentSave(student.id)}
                         />
                       </TableCell>
 
@@ -537,6 +539,7 @@ export default function ScoreEntryPage() {
                           className="h-8 w-16 text-sm"
                           value={scoreData.exam ?? ""}
                           onChange={(event) => updateLocal(student.id, "exam", event.target.value)}
+                          onBlur={() => commitCurrentSave(student.id)}
                         />
                       </TableCell>
 
