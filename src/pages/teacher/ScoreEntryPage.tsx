@@ -46,7 +46,7 @@ export default function ScoreEntryPage() {
   const isSecondTerm = activeTerm === "Second Term";
   const isThirdTerm = activeTerm === "Third Term";
 
-  
+
   useEffect(() => {
     const handleBeforeUnload = () => {
       // Fire pending saves synchronously via sendBeacon isn't practical,
@@ -83,12 +83,7 @@ export default function ScoreEntryPage() {
 
       setStudents(studs || []);
 
-      if (!studs?.length) {
-        setScoreMap({});
-        setPrevTermScores({});
-        setPrevTermIds({});
-        return;
-      }
+      if (!studs?.length) return;
 
       const studentIds = studs.map((student) => student.id);
 
@@ -106,7 +101,10 @@ export default function ScoreEntryPage() {
         scoreLookup[score.student_id] = score;
       });
 
-      setScoreMap(scoreLookup);
+      setScoreMap((prev) => ({
+        ...prev,
+        ...scoreLookup,
+      }));
 
       if (isSecondTerm || isThirdTerm) {
         const prevLookup: PrevTermScores = {};
@@ -172,7 +170,7 @@ export default function ScoreEntryPage() {
         }));
       }
 
-      
+
     };
 
     void fetchData();
@@ -461,7 +459,10 @@ export default function ScoreEntryPage() {
     (refreshed || []).forEach((score) => {
       refreshedMap[score.student_id] = score;
     });
-    setScoreMap(refreshedMap);
+    setScoreMap((prev) => ({
+      ...prev,
+      ...refreshedMap,
+    }));
   };
 
   const handleAssignmentChange = (value: string) => {
@@ -574,7 +575,7 @@ export default function ScoreEntryPage() {
                           min={0}
                           max={20}
                           className="h-8 w-16 text-sm"
-                          value={scoreData.first_test ?? ""}
+                          value={scoreData.first_test !== undefined ? scoreData.first_test : ""}
                           onChange={(event) => updateLocal(student.id, "first_test", event.target.value)}
                           onBlur={() => commitCurrentSave(student.id)}
                         />
@@ -586,7 +587,7 @@ export default function ScoreEntryPage() {
                           min={0}
                           max={20}
                           className="h-8 w-16 text-sm"
-                          value={scoreData.second_test ?? ""}
+                          value={scoreData.second_test !== undefined ? scoreData.second_test : ""}
                           onChange={(event) => updateLocal(student.id, "second_test", event.target.value)}
                           onBlur={() => commitCurrentSave(student.id)}
                         />
@@ -598,7 +599,7 @@ export default function ScoreEntryPage() {
                           min={0}
                           max={60}
                           className="h-8 w-16 text-sm"
-                          value={scoreData.exam ?? ""}
+                          value={scoreData.exam !== undefined ? scoreData.exam : ""}
                           onChange={(event) => updateLocal(student.id, "exam", event.target.value)}
                           onBlur={() => commitCurrentSave(student.id)}
                         />
@@ -659,10 +660,10 @@ export default function ScoreEntryPage() {
                         <TableCell>
                           <span
                             className={`rounded px-2 py-0.5 text-xs font-bold ${displayGrade === "A1"
-                                ? "bg-success/20 text-success"
-                                : displayGrade === "F9"
-                                  ? "bg-destructive/20 text-destructive"
-                                  : "bg-secondary text-secondary-foreground"
+                              ? "bg-success/20 text-success"
+                              : displayGrade === "F9"
+                                ? "bg-destructive/20 text-destructive"
+                                : "bg-secondary text-secondary-foreground"
                               }`}
                           >
                             {displayGrade}
