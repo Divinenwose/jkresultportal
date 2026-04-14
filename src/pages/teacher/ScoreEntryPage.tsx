@@ -239,6 +239,11 @@ export default function ScoreEntryPage() {
     [assignments, calculateAverage, selectedAssignment, setSavedIndicator, settings.active_session, settings.active_term]
   );
 
+  const trackSave = useCallback((promise: Promise<void>) => {
+    inflightSaves.current.add(promise);
+    promise.finally(() => inflightSaves.current.delete(promise));
+  }, []);
+
   const scheduleAutoSave = useCallback(
     (studentId: string, scoreData: any) => {
       if (autoSaveTimers.current[studentId]) {
