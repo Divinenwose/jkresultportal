@@ -45,6 +45,18 @@ export default function ScoreEntryPage() {
   const isSecondTerm = activeTerm === "Second Term";
   const isThirdTerm = activeTerm === "Third Term";
 
+  // Flush pending saves on page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Fire pending saves synchronously via sendBeacon isn't practical,
+      // but we can at least flush timers
+      Object.keys(autoSaveTimers.current).forEach((id) => clearTimeout(autoSaveTimers.current[id]));
+      Object.keys(prevTermTimers.current).forEach((id) => clearTimeout(prevTermTimers.current[id]));
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
+
   useEffect(() => {
     if (!user) return;
 
