@@ -331,6 +331,20 @@ export default function ScoreEntryPage() {
     });
   };
 
+  const commitCurrentSave = useCallback(
+    (studentId: string) => {
+      if (autoSaveTimers.current[studentId]) {
+        clearTimeout(autoSaveTimers.current[studentId]);
+        delete autoSaveTimers.current[studentId];
+      }
+      const scoreData = scoreMap[studentId];
+      if (scoreData) {
+        void autoSaveStudent(studentId, scoreData, false);
+      }
+    },
+    [autoSaveStudent, scoreMap]
+  );
+
   const updatePrevTerm = (studentId: string, termKey: "term1" | "term2", value: string) => {
     const clamped = clampValue(value, 100);
     const numericValue = clamped === "" ? 0 : Number(clamped);
