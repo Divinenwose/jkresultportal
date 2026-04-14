@@ -46,7 +46,7 @@ export default function ScoreEntryPage() {
   const isSecondTerm = activeTerm === "Second Term";
   const isThirdTerm = activeTerm === "Third Term";
 
-  // Flush pending saves on page unload
+  
   useEffect(() => {
     const handleBeforeUnload = () => {
       // Fire pending saves synchronously via sendBeacon isn't practical,
@@ -92,6 +92,7 @@ export default function ScoreEntryPage() {
 
       const studentIds = studs.map((student) => student.id);
 
+      // CURRENT TERM SCORES
       const { data: existingScores } = await supabase
         .from("scores")
         .select("*")
@@ -104,12 +105,14 @@ export default function ScoreEntryPage() {
       (existingScores || []).forEach((score) => {
         scoreLookup[score.student_id] = score;
       });
+
       setScoreMap(scoreLookup);
 
       if (isSecondTerm || isThirdTerm) {
         const prevLookup: PrevTermScores = {};
         const idLookup: PrevTermIds = {};
 
+        // FIRST TERM
         const { data: termOneScores } = await supabase
           .from("scores")
           .select("id, student_id, total")
@@ -118,11 +121,21 @@ export default function ScoreEntryPage() {
           .eq("session", settings.active_session)
           .in("student_id", studentIds);
 
-        (termOneScores || []).forEach((score) => {
-          prevLookup[score.student_id] = { ...prevLookup[score.student_id], term1: Number(score.total) || 0 };
-          idLookup[score.student_id] = { ...idLookup[score.student_id], term1Id: score.id };
-        });
+        if (termOneScores?.length) {
+          termOneScores.forEach((score) => {
+            prevLookup[score.student_id] = {
+              ...prevLookup[score.student_id],
+              term1: Number(score.total) || 0,
+            };
 
+            idLookup[score.student_id] = {
+              ...idLookup[score.student_id],
+              term1Id: score.id,
+            };
+          });
+        }
+
+        // SECOND TERM (only in 3rd term view)
         if (isThirdTerm) {
           const { data: termTwoScores } = await supabase
             .from("scores")
@@ -132,18 +145,34 @@ export default function ScoreEntryPage() {
             .eq("session", settings.active_session)
             .in("student_id", studentIds);
 
-          (termTwoScores || []).forEach((score) => {
-            prevLookup[score.student_id] = { ...prevLookup[score.student_id], term2: Number(score.total) || 0 };
-            idLookup[score.student_id] = { ...idLookup[score.student_id], term2Id: score.id };
-          });
+          if (termTwoScores?.length) {
+            termTwoScores.forEach((score) => {
+              prevLookup[score.student_id] = {
+                ...prevLookup[score.student_id],
+                term2: Number(score.total) || 0,
+              };
+
+              idLookup[score.student_id] = {
+                ...idLookup[score.student_id],
+                term2Id: score.id,
+              };
+            });
+          }
         }
 
-        setPrevTermScores(prevLookup);
-        setPrevTermIds(idLookup);
-      } else {
-        setPrevTermScores({});
-        setPrevTermIds({});
+        // ✅ CRITICAL FIX: MERGE instead of overwrite
+        setPrevTermScores((prev) => ({
+          ...prev,
+          ...prevLookup,
+        }));
+
+        setPrevTermIds((prev) => ({
+          ...prev,
+          ...idLookup,
+        }));
       }
+
+      
     };
 
     void fetchData();
@@ -629,13 +658,12 @@ export default function ScoreEntryPage() {
                       {!isJSS && (
                         <TableCell>
                           <span
-                            className={`rounded px-2 py-0.5 text-xs font-bold ${
-                              displayGrade === "A1"
+                            className={`rounded px-2 py-0.5 text-xs font-bold ${displayGrade === "A1"
                                 ? "bg-success/20 text-success"
                                 : displayGrade === "F9"
                                   ? "bg-destructive/20 text-destructive"
                                   : "bg-secondary text-secondary-foreground"
-                            }`}
+                              }`}
                           >
                             {displayGrade}
                           </span>
