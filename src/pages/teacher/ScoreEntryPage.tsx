@@ -40,6 +40,7 @@ export default function ScoreEntryPage() {
 
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const prevTermTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const inflightSaves = useRef<Set<Promise<void>>>(new Set());
 
   const activeTerm = settings.active_term;
   const isSecondTerm = activeTerm === "Second Term";
