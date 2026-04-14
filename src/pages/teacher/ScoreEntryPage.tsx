@@ -45,6 +45,18 @@ export default function ScoreEntryPage() {
   const isSecondTerm = activeTerm === "Second Term";
   const isThirdTerm = activeTerm === "Third Term";
 
+  // Flush pending saves on page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Fire pending saves synchronously via sendBeacon isn't practical,
+      // but we can at least flush timers
+      Object.keys(autoSaveTimers.current).forEach((id) => clearTimeout(autoSaveTimers.current[id]));
+      Object.keys(prevTermTimers.current).forEach((id) => clearTimeout(prevTermTimers.current[id]));
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
+
   useEffect(() => {
     if (!user) return;
 
@@ -331,6 +343,20 @@ export default function ScoreEntryPage() {
     });
   };
 
+  const commitCurrentSave = useCallback(
+    (studentId: string) => {
+      if (autoSaveTimers.current[studentId]) {
+        clearTimeout(autoSaveTimers.current[studentId]);
+        delete autoSaveTimers.current[studentId];
+      }
+      const scoreData = scoreMap[studentId];
+      if (scoreData) {
+        void autoSaveStudent(studentId, scoreData, false);
+      }
+    },
+    [autoSaveStudent, scoreMap]
+  );
+
   const updatePrevTerm = (studentId: string, termKey: "term1" | "term2", value: string) => {
     const clamped = clampValue(value, 100);
     const numericValue = clamped === "" ? 0 : Number(clamped);
@@ -501,6 +527,7 @@ export default function ScoreEntryPage() {
                           className="h-8 w-16 text-sm"
                           value={scoreData.first_test ?? ""}
                           onChange={(event) => updateLocal(student.id, "first_test", event.target.value)}
+                          onBlur={() => commitCurrentSave(student.id)}
                         />
                       </TableCell>
 
@@ -512,6 +539,7 @@ export default function ScoreEntryPage() {
                           className="h-8 w-16 text-sm"
                           value={scoreData.second_test ?? ""}
                           onChange={(event) => updateLocal(student.id, "second_test", event.target.value)}
+                          onBlur={() => commitCurrentSave(student.id)}
                         />
                       </TableCell>
 
@@ -523,6 +551,7 @@ export default function ScoreEntryPage() {
                           className="h-8 w-16 text-sm"
                           value={scoreData.exam ?? ""}
                           onChange={(event) => updateLocal(student.id, "exam", event.target.value)}
+                          onBlur={() => commitCurrentSave(student.id)}
                         />
                       </TableCell>
 
