@@ -307,6 +307,8 @@ export default function ScoreEntryPage() {
     [autoSavePrevTerm, prevTermScores]
   );
 
+  const flushPendingSavesRef = useRef<() => Promise<void>>();
+
   const flushPendingSaves = useCallback(async () => {
     const pendingCurrentStudentIds = Object.keys(autoSaveTimers.current);
     const pendingPrevTermKeys = Object.keys(prevTermTimers.current);
@@ -329,6 +331,11 @@ export default function ScoreEntryPage() {
       }),
     ]);
   }, [autoSavePrevTerm, autoSaveStudent, prevTermScores, scoreMap]);
+
+  // Keep a ref so handleAssignmentChange always uses latest closure
+  useEffect(() => {
+    flushPendingSavesRef.current = flushPendingSaves;
+  }, [flushPendingSaves]);
 
   const updateLocal = (studentId: string, field: string, value: string) => {
     const maxMap: Record<string, number> = { first_test: 20, second_test: 20, exam: 60 };
