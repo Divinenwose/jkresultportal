@@ -437,13 +437,13 @@ export default function ScoreEntryPage() {
 
     await Promise.all([
       ...Array.from(inflightSaves.current),
-      ...pendingCurrentStudentIds.map((studentId) => autoSaveStudent(studentId, scoreMap[studentId] || {}, false)),
+      ...pendingCurrentStudentIds.map((studentId) => autoSaveStudent(studentId, scoreMapRef.current[studentId] || {}, false)),
       ...pendingPrevTermKeys.map((timerKey) => {
         const [studentId, termKey] = timerKey.split("::") as [string, "term1" | "term2"];
-        return autoSavePrevTerm(studentId, termKey, Number(prevTermScores[selectedAssignment]?.[studentId]?.[termKey] ?? 0));
+        return autoSavePrevTerm(studentId, termKey, Number(prevTermScoresRef.current[selectedAssignment]?.[studentId]?.[termKey] ?? 0));
       }),
     ]);
-  }, [autoSavePrevTerm, autoSaveStudent, prevTermScores, scoreMap]);
+  }, [autoSavePrevTerm, autoSaveStudent, selectedAssignment]);
 
   // Keep a ref so handleAssignmentChange always uses latest closure
   useEffect(() => {
