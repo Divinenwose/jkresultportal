@@ -20,6 +20,7 @@ export default function ApprovePage() {
   const [scores, setScores] = useState<Record<string, any[]>>({});
   const [saving, setSaving] = useState<string | null>(null);
 
+
   useEffect(() => {
     if (!selectedClass || settingsLoading) return;
     const fetch = async () => {
@@ -30,7 +31,7 @@ export default function ApprovePage() {
         const ids = studs.map(s => s.id);
         const [reportsRes, scoresRes] = await Promise.all([
           supabase.from('reports').select('*').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any),
-          supabase.from('scores').select('*, subjects(name)').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any),
+          supabase.from('scores').select('*, subjects(name)').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any).eq('submitted', true),
         ]);
 
         const rMap: Record<string, any> = {};
@@ -120,6 +121,7 @@ export default function ApprovePage() {
           {students.map(student => {
             const report = reports[student.id];
             const studentScores = scores[student.id] || [];
+            const submittedCount = studentScores.filter(s => s.submitted).length;
             const isApproved = report?.approved;
 
             return (
@@ -135,11 +137,12 @@ export default function ApprovePage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="text-xs text-muted-foreground">
-                    {studentScores.length} subjects submitted •
+                    {submittedCount} subjects submitted •
                     Total: {studentScores.reduce((s, sc) => s + (Number(sc.total) || 0), 0)} •
-                    Avg: {studentScores.length ? (studentScores.reduce((s, sc) => s + (Number(sc.total) || 0), 0) / studentScores.length).toFixed(1) : '0'}
+                    Avg: {studentScores.length
+                      ? (studentScores.reduce((s, sc) => s + (Number(sc.total) || 0), 0) / studentScores.length).toFixed(1)
+                      : '0'}
                   </div>
-
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs">Attendance - Days Opened</Label>

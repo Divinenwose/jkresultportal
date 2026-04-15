@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { calculateGrade } from "@/lib/constants";
+import { calculateGrade, GRADE_SCALE } from "@/lib/constants";
 import { useSettings } from "@/hooks/useSettings";
 import { Check, Save } from "lucide-react";
 
@@ -33,6 +33,12 @@ function commentFromGrade(grade: string): string {
   }
 }
 
+function getCommentForScore(average: number, isJSSClass: boolean): string {
+  if (isJSSClass) return autoComment(average);
+  const grade = calculateGrade(average);
+  return GRADE_SCALE.find((item) => item.grade === grade)?.remark ?? autoComment(average);
+}
+
 type PrevTermScores = Record<string, { term1?: number; term2?: number }>;
 type PrevTermIds = Record<string, { term1Id?: string; term2Id?: string }>;
 type AutoSaveStatus = Record<string, "saving" | "saved" | "">;
@@ -45,6 +51,7 @@ export default function ScoreEntryPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [scoreMap, setScoreMap] = useState<Record<string, any>>({});
   const [prevTermScores, setPrevTermScores] = useState<Record<string, PrevTermScores>>({});
+  const prevTermScoresRef = useRef<Record<string, PrevTermScores>>({});
   const [prevTermIds, setPrevTermIds] = useState<Record<string, PrevTermIds>>({});
   const [saving, setSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>({});
@@ -52,10 +59,15 @@ export default function ScoreEntryPage() {
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const prevTermTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const inflightSaves = useRef<Set<Promise<void>>>(new Set());
+  const scoreMapRef = useRef<Record<string, any>>({});
 
   const activeTerm = settings.active_term;
   const isSecondTerm = activeTerm === "Second Term";
   const isThirdTerm = activeTerm === "Third Term";
+
+  // Keep refs in sync with state
+  useEffect(() => { prevTermScoresRef.current = prevTermScores; }, [prevTermScores]);
+  useEffect(() => { scoreMapRef.current = scoreMap; }, [scoreMap]);
 
 
   useEffect(() => {
@@ -297,12 +309,14 @@ export default function ScoreEntryPage() {
       const assignment = assignments.find((item) => item.id === selectedAssignment);
       if (!assignment) return;
 
+      const className = assignment.subjects?.class || assignment.class || "";
+      const isJSSClass = ["JSS1", "JSS2", "JSS3"].includes(className);
       const first = Number(scoreData.first_test) || 0;
       const second = Number(scoreData.second_test) || 0;
       const exam = Number(scoreData.exam) || 0;
       const total = first + second + exam;
-      const avg = calculateAverage(studentId, scoreData);
-      const grade = calculateGrade(avg);
+      const average = calculateAverage(studentId, scoreData);
+      const comment = getCommentForScore(average, isJSSClass);
 
       setAutoSaveStatus((prev) => ({ ...prev, [studentId]: "saving" }));
 
@@ -311,7 +325,7 @@ export default function ScoreEntryPage() {
         second_test: second,
         exam,
         total,
-        subject_comment: commentFromGrade(grade),
+        subject_comment: comment || null,
         submitted,
       };
 
@@ -446,12 +460,12 @@ export default function ScoreEntryPage() {
       }
 
       const value =
-        prevTermScores[selectedAssignment]?.[studentId]?.[termKey] ?? 0;
+        prevTermScoresRef.current[selectedAssignment]?.[studentId]?.[termKey] ?? 0;
 
       const p = autoSavePrevTerm(studentId, termKey, Number(value));
       trackSave(p);
     },
-    [autoSavePrevTerm, prevTermScores, selectedAssignment, trackSave]
+    [autoSavePrevTerm, selectedAssignment, trackSave]
   );
 
   const flushPendingSavesRef = useRef<() => Promise<void>>();
@@ -472,22 +486,35 @@ export default function ScoreEntryPage() {
 
     await Promise.all([
       ...Array.from(inflightSaves.current),
-      ...pendingCurrentStudentIds.map((studentId) => autoSaveStudent(studentId, scoreMap[studentId] || {}, false)),
+      ...pendingCurrentStudentIds.map((studentId) => autoSaveStudent(studentId, scoreMapRef.current[studentId] || {}, false)),
       ...pendingPrevTermKeys.map((timerKey) => {
         const [studentId, termKey] = timerKey.split("::") as [string, "term1" | "term2"];
-        return autoSavePrevTerm(studentId, termKey, Number(prevTermScores[selectedAssignment]?.[studentId]?.[termKey] ?? 0));
+        return autoSavePrevTerm(studentId, termKey, Number(prevTermScoresRef.current[selectedAssignment]?.[studentId]?.[termKey] ?? 0));
       }),
     ]);
-  }, [autoSavePrevTerm, autoSaveStudent, prevTermScores, scoreMap]);
+  }, [autoSavePrevTerm, autoSaveStudent, selectedAssignment]);
 
   // Keep a ref so handleAssignmentChange always uses latest closure
   useEffect(() => {
     flushPendingSavesRef.current = flushPendingSaves;
   }, [flushPendingSaves]);
 
+  useEffect(() => {
+    const handleBeforeSignOut = (event: Event) => {
+      const detail = (event as CustomEvent<{ promises?: Promise<void>[] }>).detail;
+      detail?.promises?.push(flushPendingSavesRef.current?.() ?? Promise.resolve());
+    };
+
+    window.addEventListener("app:before-signout", handleBeforeSignOut);
+    return () => window.removeEventListener("app:before-signout", handleBeforeSignOut);
+  }, []);
+
   const updateLocal = (studentId: string, field: string, value: string) => {
     const maxMap: Record<string, number> = { first_test: 20, second_test: 20, exam: 60 };
     const clamped = maxMap[field] ? clampValue(value, maxMap[field]) : value;
+    const assignment = assignments.find((item) => item.id === selectedAssignment);
+    const className = assignment?.subjects?.class || assignment?.class || "";
+    const isJSSClass = ["JSS1", "JSS2", "JSS3"].includes(className);
 
     setScoreMap((prev) => {
       const updated = {
@@ -500,13 +527,7 @@ export default function ScoreEntryPage() {
 
       // ✅ NEW LOGIC
       const average = calculateAverage(studentId, updated[studentId]);
-      const grade = calculateGrade(average);
-
-      updated[studentId] = {
-        ...updated[studentId],
-        subject_comment: commentFromGrade(grade),
-      };
-
+      updated[studentId] = { ...updated[studentId], subject_comment: getCommentForScore(average, isJSSClass) };
       scheduleAutoSave(studentId, updated[studentId]);
 
       return updated;
@@ -519,33 +540,42 @@ export default function ScoreEntryPage() {
         clearTimeout(autoSaveTimers.current[studentId]);
         delete autoSaveTimers.current[studentId];
       }
-      const scoreData = scoreMap[studentId];
+      const scoreData = scoreMapRef.current[studentId];
       if (scoreData) {
         const p = autoSaveStudent(studentId, scoreData, false);
         trackSave(p);
       }
     },
-    [autoSaveStudent, scoreMap, trackSave]
+    [autoSaveStudent, trackSave]
   );
 
   const updatePrevTerm = (studentId: string, termKey: "term1" | "term2", value: string) => {
     const clamped = clampValue(value, 100);
     const numericValue = clamped === "" ? 0 : Number(clamped);
+    const timerKey = `${studentId}::${termKey}`;
 
-    setPrevTermScores((prev) => {
-      const updatedAssignment = {
-        ...(prev[selectedAssignment] || {}),
+    prevTermScoresRef.current = {
+      ...prevTermScoresRef.current,
+      [selectedAssignment]: {
+        ...(prevTermScoresRef.current[selectedAssignment] || {}),
         [studentId]: {
-          ...(prev[selectedAssignment]?.[studentId] || {}),
+          ...(prevTermScoresRef.current[selectedAssignment]?.[studentId] || {}),
           [termKey]: numericValue,
         },
-      };
+      },
+    };
 
-      return {
-        ...prev,
-        [selectedAssignment]: updatedAssignment,
-      };
-    });
+    setPrevTermScores(prevTermScoresRef.current);
+
+    if (prevTermTimers.current[timerKey]) {
+      clearTimeout(prevTermTimers.current[timerKey]);
+    }
+
+    prevTermTimers.current[timerKey] = setTimeout(() => {
+      delete prevTermTimers.current[timerKey];
+      const p = autoSavePrevTerm(studentId, termKey, numericValue);
+      trackSave(p);
+    }, 800);
   };
 
   const handleSaveAll = async () => {
@@ -673,6 +703,7 @@ export default function ScoreEntryPage() {
                   const prev = prevTermScores[selectedAssignment]?.[student.id];
                   const average = calculateAverage(student.id, scoreData);
                   const displayGrade = calculateGrade(average);
+                  const comment = getCommentForScore(average, isJSS);
                   return (
                     <TableRow key={student.id}>
                       <TableCell className="font-medium text-sm">
@@ -794,7 +825,7 @@ export default function ScoreEntryPage() {
                       )}
 
                       <TableCell className="text-xs font-medium">
-                        {commentFromGrade(displayGrade)}
+                        {comment}
                       </TableCell>
                     </TableRow>
                   );
@@ -807,3 +838,12 @@ export default function ScoreEntryPage() {
     </DashboardLayout>
   );
 }
+function autoComment(average: number): string {
+  if (average >= 80) return "Excellent";
+  if (average >= 70) return "Very Good";
+  if (average >= 60) return "Good";
+  if (average >= 50) return "Fair";
+  if (average >= 40) return "Pass";
+  return "Fail";
+}
+
