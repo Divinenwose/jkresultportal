@@ -411,12 +411,12 @@ export default function ScoreEntryPage() {
       }
 
       const value =
-        prevTermScores[selectedAssignment]?.[studentId]?.[termKey] ?? 0;
+        prevTermScoresRef.current[selectedAssignment]?.[studentId]?.[termKey] ?? 0;
 
       const p = autoSavePrevTerm(studentId, termKey, Number(value));
       trackSave(p);
     },
-    [autoSavePrevTerm, prevTermScores, selectedAssignment, trackSave]
+    [autoSavePrevTerm, selectedAssignment, trackSave]
   );
 
   const flushPendingSavesRef = useRef<() => Promise<void>>();
