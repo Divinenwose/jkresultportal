@@ -12,14 +12,25 @@ import { calculateGrade } from "@/lib/constants";
 import { useSettings } from "@/hooks/useSettings";
 import { Check, Save } from "lucide-react";
 
-function autoComment(total: number): string {
-  if (total >= 75) return "Excellent";
-  if (total >= 70) return "Very Good";
-  if (total >= 65) return "Good";
-  if (total >= 50) return "Credit";
-  if (total >= 40) return "Pass";
-  if (total > 0) return "Fail";
-  return "";
+function commentFromGrade(grade: string): string {
+  switch (grade) {
+    case "A1":
+      return "Excellent";
+    case "B2":
+    case "B3":
+      return "Very Good";
+    case "C4":
+    case "C5":
+    case "C6":
+      return "Good";
+    case "D7":
+    case "E8":
+      return "Pass";
+    case "F9":
+      return "Fail";
+    default:
+      return "";
+  }
 }
 
 type PrevTermScores = Record<string, { term1?: number; term2?: number }>;
@@ -82,7 +93,7 @@ export default function ScoreEntryPage() {
 
 
   useEffect(() => {
-    if (!user) {
+    if (user === null) {
       setStudents([]);
       setScoreMap({});
       setPrevTermScores({});
@@ -201,16 +212,21 @@ export default function ScoreEntryPage() {
           });
         }
 
-
         setPrevTermScores((prev) => {
-          const existing = prev[selectedAssignment] || {};
+          const existingAssignment = prev[selectedAssignment] || {};
+
+          const merged = { ...existingAssignment };
+
+          Object.keys(prevLookup).forEach((studentId) => {
+            merged[studentId] = {
+              ...(existingAssignment[studentId] || {}),
+              ...prevLookup[studentId],
+            };
+          });
 
           return {
             ...prev,
-            [selectedAssignment]: {
-              ...existing,
-              ...prevLookup,
-            },
+            [selectedAssignment]: merged,
           };
         });
 
@@ -285,6 +301,8 @@ export default function ScoreEntryPage() {
       const second = Number(scoreData.second_test) || 0;
       const exam = Number(scoreData.exam) || 0;
       const total = first + second + exam;
+      const avg = calculateAverage(studentId, scoreData);
+      const grade = calculateGrade(avg);
 
       setAutoSaveStatus((prev) => ({ ...prev, [studentId]: "saving" }));
 
@@ -293,7 +311,7 @@ export default function ScoreEntryPage() {
         second_test: second,
         exam,
         total,
-        subject_comment: scoreData.subject_comment || autoComment(calculateAverage(studentId, scoreData)) || null,
+        subject_comment: commentFromGrade(grade),
         submitted,
       };
 
@@ -315,14 +333,25 @@ export default function ScoreEntryPage() {
         if (data) {
           setScoreMap((prev) => ({
             ...prev,
-            [studentId]: { ...prev[studentId], id: data.id, submitted: data.submitted },
+            [studentId]: {
+              ...prev[studentId],
+              id: data.id,
+              submitted: data.submitted,
+            },
           }));
         }
       }
 
       setSavedIndicator(studentId);
     },
-    [assignments, calculateAverage, selectedAssignment, setSavedIndicator, settings.active_session, settings.active_term]
+    [
+      assignments,
+      calculateAverage,
+      selectedAssignment,
+      setSavedIndicator,
+      settings.active_session,
+      settings.active_term,
+    ]
   );
 
   const trackSave = useCallback((promise: Promise<void>) => {
@@ -342,6 +371,18 @@ export default function ScoreEntryPage() {
     },
     [autoSaveStudent]
   );
+
+  const schedulePrevTermSave = (studentId: string, termKey: "term1" | "term2") => {
+    const timerKey = `${studentId}::${termKey}`;
+
+    if (prevTermTimers.current[timerKey]) {
+      clearTimeout(prevTermTimers.current[timerKey]);
+    }
+
+    prevTermTimers.current[timerKey] = setTimeout(() => {
+      commitPrevTermSave(studentId, termKey);
+    }, 1500);
+  };
 
   const autoSavePrevTerm = useCallback(
     async (studentId: string, termKey: "term1" | "term2", totalValue: number) => {
@@ -449,10 +490,25 @@ export default function ScoreEntryPage() {
     const clamped = maxMap[field] ? clampValue(value, maxMap[field]) : value;
 
     setScoreMap((prev) => {
-      const updated = { ...prev, [studentId]: { ...prev[studentId], [field]: clamped } };
+      const updated = {
+        ...prev,
+        [studentId]: {
+          ...prev[studentId],
+          [field]: clamped,
+        },
+      };
+
+      // ✅ NEW LOGIC
       const average = calculateAverage(studentId, updated[studentId]);
-      updated[studentId] = { ...updated[studentId], subject_comment: autoComment(average) };
+      const grade = calculateGrade(average);
+
+      updated[studentId] = {
+        ...updated[studentId],
+        subject_comment: commentFromGrade(grade),
+      };
+
       scheduleAutoSave(studentId, updated[studentId]);
+
       return updated;
     });
   };
@@ -676,8 +732,10 @@ export default function ScoreEntryPage() {
                               max={100}
                               className="h-8 w-20 text-sm"
                               value={prev?.term1 ?? ""}
-                              onChange={(event) => updatePrevTerm(student.id, "term1", event.target.value)}
-                              onBlur={() => commitPrevTermSave(student.id, "term1")}
+                              onChange={(event) => {
+                                updatePrevTerm(student.id, "term1", event.target.value);
+                                schedulePrevTermSave(student.id, "term1");
+                              }}
                             />
                           </TableCell>
                           <TableCell className="bg-accent/10 text-center text-sm font-bold text-primary">
@@ -695,8 +753,10 @@ export default function ScoreEntryPage() {
                               max={100}
                               className="h-8 w-20 text-sm"
                               value={prev?.term1 ?? ""}
-                              onChange={(event) => updatePrevTerm(student.id, "term1", event.target.value)}
-                              onBlur={() => commitPrevTermSave(student.id, "term1")}
+                              onChange={(event) => {
+                                updatePrevTerm(student.id, "term1", event.target.value);
+                                schedulePrevTermSave(student.id, "term1");
+                              }}
                             />
                           </TableCell>
                           <TableCell className="bg-accent/10 p-1">
@@ -706,8 +766,10 @@ export default function ScoreEntryPage() {
                               max={100}
                               className="h-8 w-20 text-sm"
                               value={prev?.term2 ?? ""}
-                              onChange={(event) => updatePrevTerm(student.id, "term2", event.target.value)}
-                              onBlur={() => commitPrevTermSave(student.id, "term2")}
+                              onChange={(event) => {
+                                updatePrevTerm(student.id, "term2", event.target.value);
+                                schedulePrevTermSave(student.id, "term2");
+                              }}
                             />
                           </TableCell>
                           <TableCell className="bg-accent/10 text-center text-sm font-bold text-primary">
@@ -732,7 +794,7 @@ export default function ScoreEntryPage() {
                       )}
 
                       <TableCell className="text-xs font-medium">
-                        {scoreData.subject_comment || autoComment(average)}
+                        {commentFromGrade(displayGrade)}
                       </TableCell>
                     </TableRow>
                   );
