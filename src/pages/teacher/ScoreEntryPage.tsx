@@ -326,6 +326,7 @@ export default function ScoreEntryPage() {
         exam,
         total,
         subject_comment: comment || null,
+        submitted: submitted, // ✅ ADD THIS
       };
 
       if (scoreData.id) {
@@ -600,7 +601,6 @@ export default function ScoreEntryPage() {
 
       toast.success("Scores submitted successfully!");
 
-      // 3. refresh latest data from DB
       const { data: refreshed } = await supabase
         .from("scores")
         .select("*")
