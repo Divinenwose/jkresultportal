@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { calculateGrade } from "@/lib/constants";
+import { calculateGrade, GRADE_SCALE } from "@/lib/constants";
 import { useSettings } from "@/hooks/useSettings";
 import { Check, Save } from "lucide-react";
 
@@ -20,6 +20,12 @@ function autoComment(total: number): string {
   if (total >= 40) return "Pass";
   if (total > 0) return "Fail";
   return "";
+}
+
+function getCommentForScore(average: number, isJSSClass: boolean): string {
+  if (isJSSClass) return autoComment(average);
+  const grade = calculateGrade(average);
+  return GRADE_SCALE.find((item) => item.grade === grade)?.remark ?? autoComment(average);
 }
 
 type PrevTermScores = Record<string, { term1?: number; term2?: number }>;
@@ -287,10 +293,14 @@ export default function ScoreEntryPage() {
       const assignment = assignments.find((item) => item.id === selectedAssignment);
       if (!assignment) return;
 
+      const className = assignment.subjects?.class || assignment.class || "";
+      const isJSSClass = ["JSS1", "JSS2", "JSS3"].includes(className);
       const first = Number(scoreData.first_test) || 0;
       const second = Number(scoreData.second_test) || 0;
       const exam = Number(scoreData.exam) || 0;
       const total = first + second + exam;
+      const average = calculateAverage(studentId, scoreData);
+      const comment = getCommentForScore(average, isJSSClass);
 
       setAutoSaveStatus((prev) => ({ ...prev, [studentId]: "saving" }));
 
@@ -299,7 +309,7 @@ export default function ScoreEntryPage() {
         second_test: second,
         exam,
         total,
-        subject_comment: scoreData.subject_comment || autoComment(calculateAverage(studentId, scoreData)) || null,
+        subject_comment: comment || null,
         submitted,
       };
 
@@ -450,14 +460,27 @@ export default function ScoreEntryPage() {
     flushPendingSavesRef.current = flushPendingSaves;
   }, [flushPendingSaves]);
 
+  useEffect(() => {
+    const handleBeforeSignOut = (event: Event) => {
+      const detail = (event as CustomEvent<{ promises?: Promise<void>[] }>).detail;
+      detail?.promises?.push(flushPendingSavesRef.current?.() ?? Promise.resolve());
+    };
+
+    window.addEventListener("app:before-signout", handleBeforeSignOut);
+    return () => window.removeEventListener("app:before-signout", handleBeforeSignOut);
+  }, []);
+
   const updateLocal = (studentId: string, field: string, value: string) => {
     const maxMap: Record<string, number> = { first_test: 20, second_test: 20, exam: 60 };
     const clamped = maxMap[field] ? clampValue(value, maxMap[field]) : value;
+    const assignment = assignments.find((item) => item.id === selectedAssignment);
+    const className = assignment?.subjects?.class || assignment?.class || "";
+    const isJSSClass = ["JSS1", "JSS2", "JSS3"].includes(className);
 
     setScoreMap((prev) => {
       const updated = { ...prev, [studentId]: { ...prev[studentId], [field]: clamped } };
       const average = calculateAverage(studentId, updated[studentId]);
-      updated[studentId] = { ...updated[studentId], subject_comment: autoComment(average) };
+      updated[studentId] = { ...updated[studentId], subject_comment: getCommentForScore(average, isJSSClass) };
       scheduleAutoSave(studentId, updated[studentId]);
       return updated;
     });
@@ -623,6 +646,7 @@ export default function ScoreEntryPage() {
                   const prev = prevTermScores[selectedAssignment]?.[student.id];
                   const average = calculateAverage(student.id, scoreData);
                   const displayGrade = calculateGrade(average);
+                  const comment = getCommentForScore(average, isJSS);
                   return (
                     <TableRow key={student.id}>
                       <TableCell className="font-medium text-sm">
@@ -738,7 +762,7 @@ export default function ScoreEntryPage() {
                       )}
 
                       <TableCell className="text-xs font-medium">
-                        {scoreData.subject_comment || autoComment(average)}
+                        {comment}
                       </TableCell>
                     </TableRow>
                   );

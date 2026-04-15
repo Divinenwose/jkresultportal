@@ -40,6 +40,13 @@ const parentLinks = [
 export function AppSidebar() {
   const { role, profile, signOut } = useAuth();
 
+  const handleSignOut = async () => {
+    const detail: { promises: Promise<void>[] } = { promises: [] };
+    window.dispatchEvent(new CustomEvent("app:before-signout", { detail }));
+    await Promise.all(detail.promises);
+    await signOut();
+  };
+
   const links = role === 'admin' ? adminLinks : role === 'teacher' ? teacherLinks : parentLinks;
 
   return (
@@ -83,7 +90,7 @@ export function AppSidebar() {
           <span className="text-xs text-sidebar-foreground/80 truncate">{profile?.full_name}</span>
         </div>
         <button
-          onClick={signOut}
+          onClick={() => void handleSignOut()}
           className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-xs text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
         >
           <LogOut className="h-3.5 w-3.5" />
