@@ -34,6 +34,7 @@ export default function ScoreEntryPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [scoreMap, setScoreMap] = useState<Record<string, any>>({});
   const [prevTermScores, setPrevTermScores] = useState<Record<string, PrevTermScores>>({});
+  const prevTermScoresRef = useRef<Record<string, PrevTermScores>>({});
   const [prevTermIds, setPrevTermIds] = useState<Record<string, PrevTermIds>>({});
   const [saving, setSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>({});
@@ -41,10 +42,15 @@ export default function ScoreEntryPage() {
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const prevTermTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const inflightSaves = useRef<Set<Promise<void>>>(new Set());
+  const scoreMapRef = useRef<Record<string, any>>({});
 
   const activeTerm = settings.active_term;
   const isSecondTerm = activeTerm === "Second Term";
   const isThirdTerm = activeTerm === "Third Term";
+
+  // Keep refs in sync with state
+  useEffect(() => { prevTermScoresRef.current = prevTermScores; }, [prevTermScores]);
+  useEffect(() => { scoreMapRef.current = scoreMap; }, [scoreMap]);
 
 
   useEffect(() => {
@@ -405,12 +411,12 @@ export default function ScoreEntryPage() {
       }
 
       const value =
-        prevTermScores[selectedAssignment]?.[studentId]?.[termKey] ?? 0;
+        prevTermScoresRef.current[selectedAssignment]?.[studentId]?.[termKey] ?? 0;
 
       const p = autoSavePrevTerm(studentId, termKey, Number(value));
       trackSave(p);
     },
-    [autoSavePrevTerm, prevTermScores, selectedAssignment, trackSave]
+    [autoSavePrevTerm, selectedAssignment, trackSave]
   );
 
   const flushPendingSavesRef = useRef<() => Promise<void>>();
@@ -431,13 +437,13 @@ export default function ScoreEntryPage() {
 
     await Promise.all([
       ...Array.from(inflightSaves.current),
-      ...pendingCurrentStudentIds.map((studentId) => autoSaveStudent(studentId, scoreMap[studentId] || {}, false)),
+      ...pendingCurrentStudentIds.map((studentId) => autoSaveStudent(studentId, scoreMapRef.current[studentId] || {}, false)),
       ...pendingPrevTermKeys.map((timerKey) => {
         const [studentId, termKey] = timerKey.split("::") as [string, "term1" | "term2"];
-        return autoSavePrevTerm(studentId, termKey, Number(prevTermScores[selectedAssignment]?.[studentId]?.[termKey] ?? 0));
+        return autoSavePrevTerm(studentId, termKey, Number(prevTermScoresRef.current[selectedAssignment]?.[studentId]?.[termKey] ?? 0));
       }),
     ]);
-  }, [autoSavePrevTerm, autoSaveStudent, prevTermScores, scoreMap]);
+  }, [autoSavePrevTerm, autoSaveStudent, selectedAssignment]);
 
   // Keep a ref so handleAssignmentChange always uses latest closure
   useEffect(() => {
@@ -463,13 +469,13 @@ export default function ScoreEntryPage() {
         clearTimeout(autoSaveTimers.current[studentId]);
         delete autoSaveTimers.current[studentId];
       }
-      const scoreData = scoreMap[studentId];
+      const scoreData = scoreMapRef.current[studentId];
       if (scoreData) {
         const p = autoSaveStudent(studentId, scoreData, false);
         trackSave(p);
       }
     },
-    [autoSaveStudent, scoreMap, trackSave]
+    [autoSaveStudent, trackSave]
   );
 
   const updatePrevTerm = (studentId: string, termKey: "term1" | "term2", value: string) => {
