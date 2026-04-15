@@ -34,6 +34,7 @@ export default function ScoreEntryPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [scoreMap, setScoreMap] = useState<Record<string, any>>({});
   const [prevTermScores, setPrevTermScores] = useState<Record<string, PrevTermScores>>({});
+  const prevTermScoresRef = useRef<Record<string, PrevTermScores>>({});
   const [prevTermIds, setPrevTermIds] = useState<Record<string, PrevTermIds>>({});
   const [saving, setSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>({});
