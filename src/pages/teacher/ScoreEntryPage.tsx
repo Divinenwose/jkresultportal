@@ -42,10 +42,15 @@ export default function ScoreEntryPage() {
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const prevTermTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const inflightSaves = useRef<Set<Promise<void>>>(new Set());
+  const scoreMapRef = useRef<Record<string, any>>({});
 
   const activeTerm = settings.active_term;
   const isSecondTerm = activeTerm === "Second Term";
   const isThirdTerm = activeTerm === "Third Term";
+
+  // Keep refs in sync with state
+  useEffect(() => { prevTermScoresRef.current = prevTermScores; }, [prevTermScores]);
+  useEffect(() => { scoreMapRef.current = scoreMap; }, [scoreMap]);
 
 
   useEffect(() => {
