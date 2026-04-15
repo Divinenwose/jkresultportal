@@ -469,13 +469,13 @@ export default function ScoreEntryPage() {
         clearTimeout(autoSaveTimers.current[studentId]);
         delete autoSaveTimers.current[studentId];
       }
-      const scoreData = scoreMap[studentId];
+      const scoreData = scoreMapRef.current[studentId];
       if (scoreData) {
         const p = autoSaveStudent(studentId, scoreData, false);
         trackSave(p);
       }
     },
-    [autoSaveStudent, scoreMap, trackSave]
+    [autoSaveStudent, trackSave]
   );
 
   const updatePrevTerm = (studentId: string, termKey: "term1" | "term2", value: string) => {
