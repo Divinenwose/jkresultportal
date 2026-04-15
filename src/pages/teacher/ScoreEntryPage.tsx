@@ -504,21 +504,30 @@ export default function ScoreEntryPage() {
   const updatePrevTerm = (studentId: string, termKey: "term1" | "term2", value: string) => {
     const clamped = clampValue(value, 100);
     const numericValue = clamped === "" ? 0 : Number(clamped);
+    const timerKey = `${studentId}::${termKey}`;
 
-    setPrevTermScores((prev) => {
-      const updatedAssignment = {
-        ...(prev[selectedAssignment] || {}),
+    prevTermScoresRef.current = {
+      ...prevTermScoresRef.current,
+      [selectedAssignment]: {
+        ...(prevTermScoresRef.current[selectedAssignment] || {}),
         [studentId]: {
-          ...(prev[selectedAssignment]?.[studentId] || {}),
+          ...(prevTermScoresRef.current[selectedAssignment]?.[studentId] || {}),
           [termKey]: numericValue,
         },
-      };
+      },
+    };
 
-      return {
-        ...prev,
-        [selectedAssignment]: updatedAssignment,
-      };
-    });
+    setPrevTermScores(prevTermScoresRef.current);
+
+    if (prevTermTimers.current[timerKey]) {
+      clearTimeout(prevTermTimers.current[timerKey]);
+    }
+
+    prevTermTimers.current[timerKey] = setTimeout(() => {
+      delete prevTermTimers.current[timerKey];
+      const p = autoSavePrevTerm(studentId, termKey, numericValue);
+      trackSave(p);
+    }, 800);
   };
 
   const handleSaveAll = async () => {
