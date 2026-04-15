@@ -194,6 +194,37 @@ export default function ApprovePage() {
                       className="h-8 text-sm"
                     />
                   </div>
+                  <div className="border rounded p-2 bg-muted/30">
+                    <p className="text-xs font-semibold mb-2">Report Preview</p>
+
+                    {studentScores.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No submitted scores</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {studentScores.map((s) => {
+                          const total = Number(s.total) || 0;
+
+                          const grade =
+                            total >= 75 ? 'A1' :
+                              total >= 70 ? 'B2' :
+                                total >= 65 ? 'B3' :
+                                  total >= 60 ? 'C4' :
+                                    total >= 55 ? 'C5' :
+                                      total >= 50 ? 'C6' :
+                                        total >= 45 ? 'D7' :
+                                          total >= 40 ? 'E8' : 'F9';
+
+                          return (
+                            <div key={s.id} className="flex justify-between text-xs border-b pb-1">
+                              <span>{s.subjects?.name}</span>
+                              <span>{total}</span>
+                              <span className="font-semibold">{grade}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
 
                   {!isApproved && (
                     <Button onClick={() => handleApprove(student.id)} disabled={saving === student.id} size="sm">

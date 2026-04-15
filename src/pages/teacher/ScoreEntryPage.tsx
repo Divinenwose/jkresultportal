@@ -326,7 +326,6 @@ export default function ScoreEntryPage() {
         exam,
         total,
         subject_comment: comment || null,
-        submitted,
       };
 
       if (scoreData.id) {
@@ -583,33 +582,49 @@ export default function ScoreEntryPage() {
     if (!assignment) return;
 
     setSaving(true);
-    await flushPendingSaves();
 
-    for (const student of students) {
-      const scoreData = scoreMap[student.id];
-      if (!scoreData) continue;
-      await autoSaveStudent(student.id, scoreData, true);
+    try {
+      // 1. flush pending autosaves first
+      await flushPendingSaves();
+
+      // 2. submit ALL students
+      await Promise.all(
+        students.map(async (student) => {
+          const scoreData = scoreMap[student.id];
+          if (!scoreData) return;
+
+          // ✅ force submit = true
+          await autoSaveStudent(student.id, scoreData, true);
+        })
+      );
+
+      toast.success("Scores submitted successfully!");
+
+      // 3. refresh latest data from DB
+      const { data: refreshed } = await supabase
+        .from("scores")
+        .select("*")
+        .eq("subject_id", assignment.subjects.id)
+        .eq("term", settings.active_term as any)
+        .eq("session", settings.active_session)
+        .in("student_id", students.map((s) => s.id));
+
+      const refreshedMap: Record<string, any> = {};
+
+      (refreshed || []).forEach((score) => {
+        refreshedMap[score.student_id] = score;
+      });
+
+      setScoreMap((prev) => ({
+        ...prev,
+        ...refreshedMap,
+      }));
+    } catch (error) {
+      console.error("Submit error:", error);
+      toast.error("Failed to submit scores");
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
-    toast.success("Scores submitted successfully!");
-
-    const { data: refreshed } = await supabase
-      .from("scores")
-      .select("*")
-      .eq("subject_id", assignment.subjects.id)
-      .eq("term", settings.active_term as any)
-      .eq("session", settings.active_session)
-      .in("student_id", students.map((student) => student.id));
-
-    const refreshedMap: Record<string, any> = {};
-    (refreshed || []).forEach((score) => {
-      refreshedMap[score.student_id] = score;
-    });
-    setScoreMap((prev) => ({
-      ...prev,
-      ...refreshedMap,
-    }));
   };
 
   const handleAssignmentChange = (value: string) => {
