@@ -12,6 +12,11 @@ import { calculateGrade, GRADE_SCALE } from "@/lib/constants";
 import { useSettings } from "@/hooks/useSettings";
 import { Check, Save } from "lucide-react";
 
+
+type PrevTermScores = Record<string, { term1?: number; term2?: number }>;
+type PrevTermIds = Record<string, { term1Id?: string; term2Id?: string }>;
+type AutoSaveStatus = Record<string, "saving" | "saved" | "error" | "">;
+
 function commentFromGrade(grade: string): string {
   switch (grade) {
     case "A1":
@@ -39,18 +44,23 @@ function getCommentForScore(average: number, isJSSClass: boolean): string {
   return GRADE_SCALE.find((item) => item.grade === grade)?.remark ?? autoComment(average);
 }
 
-type PrevTermScores = Record<string, { term1?: number; term2?: number }>;
-type PrevTermIds = Record<string, { term1Id?: string; term2Id?: string }>;
-type AutoSaveStatus = Record<string, "saving" | "saved" | "">;
 
 export default function ScoreEntryPage() {
   const { user } = useAuth();
   const { settings } = useSettings();
+
   const [assignments, setAssignments] = useState<any[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<string>("");
   const [students, setStudents] = useState<any[]>([]);
-  const [scoreMap, setScoreMap] = useState<Record<string, any>>({});
-  const [prevTermScores, setPrevTermScores] = useState<Record<string, PrevTermScores>>({});
+
+  const [scoreMap, setScoreMap] = useState<Record<string, Record<string, any>>>(() => {
+    if (typeof window === "undefined") return {};
+    const saved = localStorage.getItem("scoreMap");
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [prevTermScores, setPrevTermScores] =
+    useState<Record<string, PrevTermScores>>({});
+
   const prevTermScoresRef = useRef<Record<string, PrevTermScores>>({});
   const [prevTermIds, setPrevTermIds] = useState<Record<string, PrevTermIds>>({});
   const [saving, setSaving] = useState(false);
@@ -65,21 +75,28 @@ export default function ScoreEntryPage() {
   const isSecondTerm = activeTerm === "Second Term";
   const isThirdTerm = activeTerm === "Third Term";
 
-  // Keep refs in sync with state
   useEffect(() => { prevTermScoresRef.current = prevTermScores; }, [prevTermScores]);
   useEffect(() => { scoreMapRef.current = scoreMap; }, [scoreMap]);
 
 
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Fire pending saves synchronously via sendBeacon isn't practical,
-      // but we can at least flush timers
       Object.keys(autoSaveTimers.current).forEach((id) => clearTimeout(autoSaveTimers.current[id]));
       Object.keys(prevTermTimers.current).forEach((id) => clearTimeout(prevTermTimers.current[id]));
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("scoreMap", JSON.stringify(scoreMap));
+    scoreMapRef.current = scoreMap;
+  }, [scoreMap]);
+
+  useEffect(() => {
+    prevTermScoresRef.current = prevTermScores;
+  }, [prevTermScores]);
+
 
   useEffect(() => {
     if (!selectedAssignment) return;
@@ -103,23 +120,6 @@ export default function ScoreEntryPage() {
     })();
   }, [assignments]);
 
-
-  useEffect(() => {
-    if (user === null) {
-      setStudents([]);
-      setScoreMap({});
-      setPrevTermScores({});
-      setPrevTermIds({});
-      setSelectedAssignment("");
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    // force refresh assignments again
-    setAssignments([]);
-  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -170,10 +170,22 @@ export default function ScoreEntryPage() {
         scoreLookup[score.student_id] = score;
       });
 
-      setScoreMap((prev) => ({
-        ...prev,
-        ...scoreLookup,
-      }));
+      setScoreMap((prev) => {
+        const updated = { ...prev };
+
+        Object.entries(scoreLookup).forEach(([studentId, score]) => {
+          if (!updated[studentId]) {
+            updated[studentId] = score;
+          } else {
+            updated[studentId] = {
+              ...updated[studentId],
+              ...score,
+            };
+          }
+        });
+
+        return updated;
+      });
 
       if (!assignment) return;
       if (isSecondTerm || isThirdTerm) {
@@ -306,66 +318,72 @@ export default function ScoreEntryPage() {
 
   const autoSaveStudent = useCallback(
     async (studentId: string, scoreData: any, submitted = false) => {
-      const assignment = assignments.find((item) => item.id === selectedAssignment);
+      const assignment = assignments.find(
+        (item) => item.id === selectedAssignment
+      );
       if (!assignment) return;
 
       const className = assignment.subjects?.class || assignment.class || "";
       const isJSSClass = ["JSS1", "JSS2", "JSS3"].includes(className);
+
       const first = Number(scoreData.first_test) || 0;
       const second = Number(scoreData.second_test) || 0;
       const exam = Number(scoreData.exam) || 0;
       const total = first + second + exam;
+
       const average = calculateAverage(studentId, scoreData);
       const comment = getCommentForScore(average, isJSSClass);
 
-      setAutoSaveStatus((prev) => ({ ...prev, [studentId]: "saving" }));
+      setAutoSaveStatus((prev) => ({
+        ...prev,
+        [studentId]: "saving",
+      }));
 
       const payload = {
+        student_id: studentId,
+        subject_id: assignment.subjects.id as string,
+        term: settings.active_term as "First Term" | "Second Term" | "Third Term",
+        session: settings.active_session,
         first_test: first,
         second_test: second,
         exam,
         total,
         subject_comment: comment || null,
-        submitted: submitted, // ✅ ADD THIS
+        submitted: submitted,
       };
 
-      if (scoreData.id) {
-        await supabase.from("scores").update(payload).eq("id", scoreData.id);
-      } else {
-        const { data } = await supabase
-          .from("scores")
-          .insert({
-            ...payload,
-            student_id: studentId,
-            subject_id: assignment.subjects.id,
-            term: settings.active_term as any,
-            session: settings.active_session,
-          })
-          .select()
-          .single();
+      const { data, error } = await supabase
+        .from("scores")
+        .upsert(payload, {
+          onConflict: "student_id,subject_id,term,session",
+        })
+        .select()
+        .single();
 
-        if (data) {
-          setScoreMap((prev) => ({
-            ...prev,
-            [studentId]: {
-              ...prev[studentId],
-              id: data.id,
-              submitted: data.submitted,
-            },
-          }));
-        }
+      if (error) {
+        setAutoSaveStatus((prev) => ({
+          ...prev,
+          [studentId]: "error",
+        }));
+        return;
       }
 
-      setSavedIndicator(studentId);
+      if (data) {
+        setScoreMap((prev) => ({
+          ...prev,
+          [studentId]: {
+            ...prev[studentId],
+            ...data,
+          },
+        }));
+      }
+
+      setAutoSaveStatus((prev) => ({
+        ...prev,
+        [studentId]: "saved",
+      }));
     },
-    [
-      assignments,
-      calculateAverage,
-      selectedAssignment,
-      setSavedIndicator,
-      settings.active_session,
-      settings.active_term,
-    ]
+    [assignments, selectedAssignment, settings]
   );
 
   const trackSave = useCallback((promise: Promise<void>) => {
@@ -517,18 +535,30 @@ export default function ScoreEntryPage() {
     const isJSSClass = ["JSS1", "JSS2", "JSS3"].includes(className);
 
     setScoreMap((prev) => {
+      const assignmentId = selectedAssignment;
+
       const updated = {
         ...prev,
-        [studentId]: {
-          ...prev[studentId],
-          [field]: clamped,
+        [assignmentId]: {
+          ...prev[assignmentId],
+          [studentId]: {
+            ...(prev[assignmentId]?.[studentId] || {}),
+            [field]: clamped,
+          },
         },
       };
 
-      // ✅ NEW LOGIC
-      const average = calculateAverage(studentId, updated[studentId]);
-      updated[studentId] = { ...updated[studentId], subject_comment: getCommentForScore(average, isJSSClass) };
-      scheduleAutoSave(studentId, updated[studentId]);
+      const average = calculateAverage(
+        studentId,
+        updated[assignmentId][studentId]
+      );
+
+      updated[assignmentId][studentId] = {
+        ...updated[assignmentId][studentId],
+        subject_comment: getCommentForScore(average, isJSSClass),
+      };
+
+      scheduleAutoSave(studentId, updated[assignmentId][studentId]);
 
       return updated;
     });
@@ -579,48 +609,25 @@ export default function ScoreEntryPage() {
   };
 
   const handleSaveAll = async () => {
-    const assignment = assignments.find((item) => item.id === selectedAssignment);
+    const assignment = assignments.find(
+      (item) => item.id === selectedAssignment
+    );
     if (!assignment) return;
 
     setSaving(true);
 
     try {
-      // 1. flush pending autosaves first
-      await flushPendingSaves();
-
-      // 2. submit ALL students
       await Promise.all(
         students.map(async (student) => {
-          const scoreData = scoreMap[student.id];
+          const scoreData = scoreMapRef.current?.[student.id];
           if (!scoreData) return;
 
-          // ✅ force submit = true
           await autoSaveStudent(student.id, scoreData, true);
         })
       );
 
       toast.success("Scores submitted successfully!");
-
-      const { data: refreshed } = await supabase
-        .from("scores")
-        .select("*")
-        .eq("subject_id", assignment.subjects.id)
-        .eq("term", settings.active_term as any)
-        .eq("session", settings.active_session)
-        .in("student_id", students.map((s) => s.id));
-
-      const refreshedMap: Record<string, any> = {};
-
-      (refreshed || []).forEach((score) => {
-        refreshedMap[score.student_id] = score;
-      });
-
-      setScoreMap((prev) => ({
-        ...prev,
-        ...refreshedMap,
-      }));
-    } catch (error) {
-      console.error("Submit error:", error);
+    } catch (err) {
       toast.error("Failed to submit scores");
     } finally {
       setSaving(false);
@@ -737,7 +744,7 @@ export default function ScoreEntryPage() {
                           min={0}
                           max={20}
                           className="h-8 w-16 text-sm"
-                          value={scoreData.first_test !== undefined ? scoreData.first_test : ""}
+                          value={scoreData.first_test ?? ""}
                           onChange={(event) => updateLocal(student.id, "first_test", event.target.value)}
                           onBlur={() => commitCurrentSave(student.id)}
                         />
@@ -749,7 +756,7 @@ export default function ScoreEntryPage() {
                           min={0}
                           max={20}
                           className="h-8 w-16 text-sm"
-                          value={scoreData.second_test !== undefined ? scoreData.second_test : ""}
+                          value={scoreData.second_test ?? ""}
                           onChange={(event) => updateLocal(student.id, "second_test", event.target.value)}
                           onBlur={() => commitCurrentSave(student.id)}
                         />
@@ -761,7 +768,7 @@ export default function ScoreEntryPage() {
                           min={0}
                           max={60}
                           className="h-8 w-16 text-sm"
-                          value={scoreData.exam !== undefined ? scoreData.exam : ""}
+                          value={scoreData.exam ?? ""}
                           onChange={(event) => updateLocal(student.id, "exam", event.target.value)}
                           onBlur={() => commitCurrentSave(student.id)}
                         />
