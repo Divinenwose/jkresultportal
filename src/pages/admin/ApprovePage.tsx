@@ -32,10 +32,14 @@ export default function ApprovePage() {
   const [students, setStudents] = useState<any[]>([]);
   const [reports, setReports] = useState<Record<string, any>>({});
   const [scores, setScores] = useState<Record<string, any[]>>({});
+  const [prevScores, setPrevScores] = useState<Record<string, Record<string, { term1?: number; term2?: number }>>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const isJSS = ["JSS1", "JSS2", "JSS3"].includes(selectedClass);
+  const isSecondTerm = settings.active_term === "Second Term";
+  const isThirdTerm = settings.active_term === "Third Term";
+  const showCumulative = isSecondTerm || isThirdTerm;
 
   const fetchData = async () => {
     if (!selectedClass || settingsLoading) return;
@@ -47,7 +51,7 @@ export default function ApprovePage() {
       const ids = studs.map(s => s.id);
       const [reportsRes, scoresRes] = await Promise.all([
         supabase.from('reports').select('*').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any),
-        supabase.from('scores').select('*, subjects(name)').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any).eq('submitted', true),
+        supabase.from('scores').select('*, subjects(name, id)').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any).eq('submitted', true),
       ]);
 
       const rMap: Record<string, any> = {};
@@ -60,6 +64,45 @@ export default function ApprovePage() {
         sMap[s.student_id].push(s);
       });
       setScores(sMap);
+
+      // Fetch previous term scores for cumulative display
+      if (showCumulative) {
+        const prevMap: Record<string, Record<string, { term1?: number; term2?: number }>> = {};
+
+        const { data: t1 } = await supabase.from('scores')
+          .select('student_id, subject_id, total')
+          .in('student_id', ids)
+          .eq('session', settings.active_session)
+          .eq('term', 'First Term' as any);
+
+        (t1 || []).forEach(s => {
+          if (!prevMap[s.student_id]) prevMap[s.student_id] = {};
+          prevMap[s.student_id][s.subject_id] = {
+            ...prevMap[s.student_id][s.subject_id],
+            term1: Number(s.total) || 0,
+          };
+        });
+
+        if (isThirdTerm) {
+          const { data: t2 } = await supabase.from('scores')
+            .select('student_id, subject_id, total')
+            .in('student_id', ids)
+            .eq('session', settings.active_session)
+            .eq('term', 'Second Term' as any);
+
+          (t2 || []).forEach(s => {
+            if (!prevMap[s.student_id]) prevMap[s.student_id] = {};
+            prevMap[s.student_id][s.subject_id] = {
+              ...prevMap[s.student_id][s.subject_id],
+              term2: Number(s.total) || 0,
+            };
+          });
+        }
+
+        setPrevScores(prevMap);
+      } else {
+        setPrevScores({});
+      }
     }
     setRefreshing(false);
   };
@@ -146,6 +189,7 @@ export default function ApprovePage() {
           {students.map(student => {
             const report = reports[student.id];
             const studentScores = scores[student.id] || [];
+            const studentPrev = prevScores[student.id] || {};
             const submittedCount = studentScores.length;
             const isApproved = report?.approved;
 
@@ -208,29 +252,70 @@ export default function ApprovePage() {
                               <TableHead className="text-[10px] py-1 text-center">2nd Test</TableHead>
                               <TableHead className="text-[10px] py-1 text-center">Exam</TableHead>
                               <TableHead className="text-[10px] py-1 text-center">Total</TableHead>
-                              {!isJSS && <TableHead className="text-[10px] py-1 text-center">Grade</TableHead>}
+                              {isSecondTerm && (
+                                <>
+                                  <TableHead className="text-[10px] py-1 text-center">1st Term</TableHead>
+                                  <TableHead className="text-[10px] py-1 text-center">Average</TableHead>
+                                </>
+                              )}
+                              {isThirdTerm && (
+                                <>
+                                  <TableHead className="text-[10px] py-1 text-center">1st Term</TableHead>
+                                  <TableHead className="text-[10px] py-1 text-center">2nd Term</TableHead>
+                                  <TableHead className="text-[10px] py-1 text-center">Average</TableHead>
+                                </>
+                              )}
+                              <TableHead className="text-[10px] py-1 text-center">Grade</TableHead>
                               <TableHead className="text-[10px] py-1">Comment</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {studentScores.map((s) => {
-                              const total = Number(s.total) || 0;
-                              const grade = calculateGrade(total);
-                              const comment = getComment(total, isJSS);
+                              const currentTotal = Number(s.total) || 0;
+                              const subjectId = s.subjects?.id || s.subject_id;
+                              const prev = studentPrev[subjectId] || {};
+                              const term1 = prev.term1 ?? 0;
+                              const term2 = prev.term2 ?? 0;
+
+                              let rowAvg = currentTotal;
+                              if (isSecondTerm) {
+                                const terms = [currentTotal, term1];
+                                const nonZero = terms.filter(t => t > 0).length || 1;
+                                rowAvg = terms.reduce((a, b) => a + b, 0) / nonZero;
+                              } else if (isThirdTerm) {
+                                const terms = [currentTotal, term1, term2];
+                                const nonZero = terms.filter(t => t > 0).length || 1;
+                                rowAvg = terms.reduce((a, b) => a + b, 0) / nonZero;
+                              }
+
+                              const grade = calculateGrade(showCumulative ? rowAvg : currentTotal);
+                              const comment = getComment(showCumulative ? rowAvg : currentTotal, isJSS);
+
                               return (
                                 <TableRow key={s.id}>
                                   <TableCell className="text-[11px] py-1">{s.subjects?.name}</TableCell>
                                   <TableCell className="text-[11px] py-1 text-center">{s.first_test ?? '-'}</TableCell>
                                   <TableCell className="text-[11px] py-1 text-center">{s.second_test ?? '-'}</TableCell>
                                   <TableCell className="text-[11px] py-1 text-center">{s.exam ?? '-'}</TableCell>
-                                  <TableCell className="text-[11px] py-1 text-center font-bold">{total}</TableCell>
-                                  {!isJSS && (
-                                    <TableCell className="text-[11px] py-1 text-center">
-                                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${grade === 'A1' ? 'bg-success/20 text-success' : grade === 'F9' ? 'bg-destructive/20 text-destructive' : 'bg-secondary text-secondary-foreground'}`}>
-                                        {grade}
-                                      </span>
-                                    </TableCell>
+                                  <TableCell className="text-[11px] py-1 text-center font-bold">{currentTotal}</TableCell>
+                                  {isSecondTerm && (
+                                    <>
+                                      <TableCell className="text-[11px] py-1 text-center">{term1}</TableCell>
+                                      <TableCell className="text-[11px] py-1 text-center font-bold">{rowAvg.toFixed(1)}</TableCell>
+                                    </>
                                   )}
+                                  {isThirdTerm && (
+                                    <>
+                                      <TableCell className="text-[11px] py-1 text-center">{term1}</TableCell>
+                                      <TableCell className="text-[11px] py-1 text-center">{term2}</TableCell>
+                                      <TableCell className="text-[11px] py-1 text-center font-bold">{rowAvg.toFixed(1)}</TableCell>
+                                    </>
+                                  )}
+                                  <TableCell className="text-[11px] py-1 text-center">
+                                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${grade === 'A1' ? 'bg-success/20 text-success' : grade === 'F9' ? 'bg-destructive/20 text-destructive' : 'bg-secondary text-secondary-foreground'}`}>
+                                      {grade}
+                                    </span>
+                                  </TableCell>
                                   <TableCell className="text-[10px] py-1">{comment}</TableCell>
                                 </TableRow>
                               );
