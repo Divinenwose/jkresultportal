@@ -7,10 +7,24 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { CLASSES } from "@/lib/constants";
+import { CLASSES, calculateGrade, GRADE_SCALE } from "@/lib/constants";
 import { useSettings } from "@/hooks/useSettings";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, RefreshCw } from "lucide-react";
+
+function getComment(average: number, isJSS: boolean): string {
+  if (isJSS) {
+    if (average >= 80) return "Excellent";
+    if (average >= 70) return "Very Good";
+    if (average >= 60) return "Good";
+    if (average >= 50) return "Fair";
+    if (average >= 40) return "Pass";
+    return "Fail";
+  }
+  const grade = calculateGrade(average);
+  return GRADE_SCALE.find((g) => g.grade === grade)?.remark ?? "Fail";
+}
 
 export default function ApprovePage() {
   const { settings, loading: settingsLoading } = useSettings();
@@ -19,34 +33,39 @@ export default function ApprovePage() {
   const [reports, setReports] = useState<Record<string, any>>({});
   const [scores, setScores] = useState<Record<string, any[]>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
+  const isJSS = ["JSS1", "JSS2", "JSS3"].includes(selectedClass);
+
+  const fetchData = async () => {
+    if (!selectedClass || settingsLoading) return;
+    setRefreshing(true);
+    const { data: studs } = await supabase.from('students').select('*').eq('class', selectedClass as any).order('full_name');
+    setStudents(studs || []);
+
+    if (studs?.length) {
+      const ids = studs.map(s => s.id);
+      const [reportsRes, scoresRes] = await Promise.all([
+        supabase.from('reports').select('*').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any),
+        supabase.from('scores').select('*, subjects(name)').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any).eq('submitted', true),
+      ]);
+
+      const rMap: Record<string, any> = {};
+      (reportsRes.data || []).forEach(r => { rMap[r.student_id] = r; });
+      setReports(rMap);
+
+      const sMap: Record<string, any[]> = {};
+      (scoresRes.data || []).forEach(s => {
+        if (!sMap[s.student_id]) sMap[s.student_id] = [];
+        sMap[s.student_id].push(s);
+      });
+      setScores(sMap);
+    }
+    setRefreshing(false);
+  };
 
   useEffect(() => {
-    if (!selectedClass || settingsLoading) return;
-    const fetch = async () => {
-      const { data: studs } = await supabase.from('students').select('*').eq('class', selectedClass as any).order('full_name');
-      setStudents(studs || []);
-
-      if (studs?.length) {
-        const ids = studs.map(s => s.id);
-        const [reportsRes, scoresRes] = await Promise.all([
-          supabase.from('reports').select('*').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any),
-          supabase.from('scores').select('*, subjects(name)').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any).eq('submitted', true),
-        ]);
-
-        const rMap: Record<string, any> = {};
-        (reportsRes.data || []).forEach(r => { rMap[r.student_id] = r; });
-        setReports(rMap);
-
-        const sMap: Record<string, any[]> = {};
-        (scoresRes.data || []).forEach(s => {
-          if (!sMap[s.student_id]) sMap[s.student_id] = [];
-          sMap[s.student_id].push(s);
-        });
-        setScores(sMap);
-      }
-    };
-    fetch();
+    fetchData();
   }, [selectedClass, settings, settingsLoading]);
 
   const handleCreateOrUpdateReport = async (studentId: string, field: string, value: any) => {
@@ -83,7 +102,7 @@ export default function ApprovePage() {
     const studentScores = scores[studentId] || [];
     const totalMarks = studentScores.reduce((sum, s) => sum + (Number(s.total) || 0), 0);
     const avg = studentScores.length ? totalMarks / studentScores.length : 0;
-    const grade = avg >= 75 ? 'A1' : avg >= 70 ? 'B2' : avg >= 65 ? 'B3' : avg >= 60 ? 'C4' : avg >= 55 ? 'C5' : avg >= 50 ? 'C6' : avg >= 45 ? 'D7' : avg >= 40 ? 'E8' : 'F9';
+    const grade = calculateGrade(avg);
 
     await supabase.from('reports').update({
       approved: true,
@@ -105,6 +124,12 @@ export default function ApprovePage() {
           <SelectTrigger className="w-40"><SelectValue placeholder="Select Class" /></SelectTrigger>
           <SelectContent>{CLASSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
         </Select>
+        {selectedClass && (
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={refreshing}>
+            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        )}
         {!settingsLoading && (
           <span className="text-xs text-muted-foreground">
             Term: <span className="font-semibold text-foreground">{settings.active_term} — {settings.active_session}</span>
@@ -121,7 +146,7 @@ export default function ApprovePage() {
           {students.map(student => {
             const report = reports[student.id];
             const studentScores = scores[student.id] || [];
-            const submittedCount = studentScores.filter(s => s.submitted).length;
+            const submittedCount = studentScores.length;
             const isApproved = report?.approved;
 
             return (
@@ -143,85 +168,75 @@ export default function ApprovePage() {
                       ? (studentScores.reduce((s, sc) => s + (Number(sc.total) || 0), 0) / studentScores.length).toFixed(1)
                       : '0'}
                   </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs">Attendance - Days Opened</Label>
-                      <Input
-                        type="number" min={0}
-                        value={report?.days_opened || ''}
-                        onChange={e => handleCreateOrUpdateReport(student.id, 'days_opened', parseInt(e.target.value) || 0)}
-                        disabled={isApproved}
-                        className="h-8 text-sm"
-                      />
+                      <Input type="number" min={0} value={report?.days_opened || ''} onChange={e => handleCreateOrUpdateReport(student.id, 'days_opened', parseInt(e.target.value) || 0)} disabled={isApproved} className="h-8 text-sm" />
                     </div>
                     <div>
                       <Label className="text-xs">Days Present</Label>
-                      <Input
-                        type="number" min={0}
-                        value={report?.days_present || ''}
-                        onChange={e => handleCreateOrUpdateReport(student.id, 'days_present', parseInt(e.target.value) || 0)}
-                        disabled={isApproved}
-                        className="h-8 text-sm"
-                      />
+                      <Input type="number" min={0} value={report?.days_present || ''} onChange={e => handleCreateOrUpdateReport(student.id, 'days_present', parseInt(e.target.value) || 0)} disabled={isApproved} className="h-8 text-sm" />
                     </div>
                   </div>
 
                   <div>
                     <Label className="text-xs">Class Teacher Comment</Label>
-                    <Textarea
-                      value={report?.teacher_comment || ''}
-                      onChange={e => handleCreateOrUpdateReport(student.id, 'teacher_comment', e.target.value)}
-                      disabled={isApproved}
-                      className="text-sm min-h-[60px]"
-                    />
+                    <Textarea value={report?.teacher_comment || ''} onChange={e => handleCreateOrUpdateReport(student.id, 'teacher_comment', e.target.value)} disabled={isApproved} className="text-sm min-h-[60px]" />
                   </div>
                   <div>
                     <Label className="text-xs">Principal Comment</Label>
-                    <Textarea
-                      value={report?.principal_comment || ''}
-                      onChange={e => handleCreateOrUpdateReport(student.id, 'principal_comment', e.target.value)}
-                      disabled={isApproved}
-                      className="text-sm min-h-[60px]"
-                    />
+                    <Textarea value={report?.principal_comment || ''} onChange={e => handleCreateOrUpdateReport(student.id, 'principal_comment', e.target.value)} disabled={isApproved} className="text-sm min-h-[60px]" />
                   </div>
                   <div>
                     <Label className="text-xs">Next Term Begins</Label>
-                    <Input
-                      type="date"
-                      value={report?.next_term_begins || ''}
-                      onChange={e => handleCreateOrUpdateReport(student.id, 'next_term_begins', e.target.value)}
-                      disabled={isApproved}
-                      className="h-8 text-sm"
-                    />
+                    <Input type="date" value={report?.next_term_begins || ''} onChange={e => handleCreateOrUpdateReport(student.id, 'next_term_begins', e.target.value)} disabled={isApproved} className="h-8 text-sm" />
                   </div>
-                  <div className="border rounded p-2 bg-muted/30">
-                    <p className="text-xs font-semibold mb-2">Report Preview</p>
 
+                  {/* Report Card Preview */}
+                  <div className="border rounded p-3 bg-muted/30">
+                    <p className="text-xs font-semibold mb-2">📋 Report Card Preview</p>
                     {studentScores.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">No submitted scores</p>
+                      <p className="text-xs text-muted-foreground">No submitted scores yet</p>
                     ) : (
-                      <div className="space-y-1">
-                        {studentScores.map((s) => {
-                          const total = Number(s.total) || 0;
-
-                          const grade =
-                            total >= 75 ? 'A1' :
-                              total >= 70 ? 'B2' :
-                                total >= 65 ? 'B3' :
-                                  total >= 60 ? 'C4' :
-                                    total >= 55 ? 'C5' :
-                                      total >= 50 ? 'C6' :
-                                        total >= 45 ? 'D7' :
-                                          total >= 40 ? 'E8' : 'F9';
-
-                          return (
-                            <div key={s.id} className="flex justify-between text-xs border-b pb-1">
-                              <span>{s.subjects?.name}</span>
-                              <span>{total}</span>
-                              <span className="font-semibold">{grade}</span>
-                            </div>
-                          );
-                        })}
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-[10px] py-1">Subject</TableHead>
+                              <TableHead className="text-[10px] py-1 text-center">1st Test</TableHead>
+                              <TableHead className="text-[10px] py-1 text-center">2nd Test</TableHead>
+                              <TableHead className="text-[10px] py-1 text-center">Exam</TableHead>
+                              <TableHead className="text-[10px] py-1 text-center">Total</TableHead>
+                              {!isJSS && <TableHead className="text-[10px] py-1 text-center">Grade</TableHead>}
+                              <TableHead className="text-[10px] py-1">Comment</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {studentScores.map((s) => {
+                              const total = Number(s.total) || 0;
+                              const grade = calculateGrade(total);
+                              const comment = getComment(total, isJSS);
+                              return (
+                                <TableRow key={s.id}>
+                                  <TableCell className="text-[11px] py-1">{s.subjects?.name}</TableCell>
+                                  <TableCell className="text-[11px] py-1 text-center">{s.first_test ?? '-'}</TableCell>
+                                  <TableCell className="text-[11px] py-1 text-center">{s.second_test ?? '-'}</TableCell>
+                                  <TableCell className="text-[11px] py-1 text-center">{s.exam ?? '-'}</TableCell>
+                                  <TableCell className="text-[11px] py-1 text-center font-bold">{total}</TableCell>
+                                  {!isJSS && (
+                                    <TableCell className="text-[11px] py-1 text-center">
+                                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${grade === 'A1' ? 'bg-success/20 text-success' : grade === 'F9' ? 'bg-destructive/20 text-destructive' : 'bg-secondary text-secondary-foreground'}`}>
+                                        {grade}
+                                      </span>
+                                    </TableCell>
+                                  )}
+                                  <TableCell className="text-[10px] py-1">{comment}</TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
                       </div>
                     )}
                   </div>
