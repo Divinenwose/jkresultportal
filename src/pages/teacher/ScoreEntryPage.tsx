@@ -431,37 +431,32 @@ export default function ScoreEntryPage() {
       const existingId =
         termKey === "term1" ? ids.term1Id : ids.term2Id;
 
-      if (existingId) {
-        await supabase
-          .from("scores")
-          .update({ total: totalValue })
-          .eq("id", existingId);
-      } else {
-        const { data } = await supabase
-          .from("scores")
-          .insert({
-            student_id: studentId,
-            subject_id: assignment.subjects.id,
-            term: termName as any,
-            session: settings.active_session,
-            total: totalValue,
-            submitted: true,
-          })
-          .select()
-          .single();
+      const payload = {
+        student_id: studentId,
+        subject_id: assignment.subjects.id,
+        term: termName as any,
+        session: settings.active_session,
+        total: totalValue,
+        submitted: true,
+      };
 
-        if (data) {
-          setPrevTermIds((prev) => ({
-            ...prev,
-            [selectedAssignment]: {
-              ...(prev[selectedAssignment] || {}),
-              [studentId]: {
-                ...(prev[selectedAssignment]?.[studentId] || {}),
-                [termKey === "term1" ? "term1Id" : "term2Id"]: data.id,
-              },
+      const { data } = await supabase
+        .from("scores")
+        .upsert(payload, { onConflict: "student_id,subject_id,term,session" })
+        .select()
+        .single();
+
+      if (data) {
+        setPrevTermIds((prev) => ({
+          ...prev,
+          [selectedAssignment]: {
+            ...(prev[selectedAssignment] || {}),
+            [studentId]: {
+              ...(prev[selectedAssignment]?.[studentId] || {}),
+              [termKey === "term1" ? "term1Id" : "term2Id"]: data.id,
             },
-          }));
-        }
+          },
+        }));
       }
 
       setSavedIndicator(studentId);
@@ -535,30 +530,22 @@ export default function ScoreEntryPage() {
     const isJSSClass = ["JSS1", "JSS2", "JSS3"].includes(className);
 
     setScoreMap((prev) => {
-      const assignmentId = selectedAssignment;
-
       const updated = {
         ...prev,
-        [assignmentId]: {
-          ...prev[assignmentId],
-          [studentId]: {
-            ...(prev[assignmentId]?.[studentId] || {}),
-            [field]: clamped,
-          },
+        [studentId]: {
+          ...(prev[studentId] || {}),
+          [field]: clamped,
         },
       };
 
-      const average = calculateAverage(
-        studentId,
-        updated[assignmentId][studentId]
-      );
+      const average = calculateAverage(studentId, updated[studentId]);
 
-      updated[assignmentId][studentId] = {
-        ...updated[assignmentId][studentId],
+      updated[studentId] = {
+        ...updated[studentId],
         subject_comment: getCommentForScore(average, isJSSClass),
       };
 
-      scheduleAutoSave(studentId, updated[assignmentId][studentId]);
+      scheduleAutoSave(studentId, updated[studentId]);
 
       return updated;
     });
