@@ -325,14 +325,20 @@ export default function ScoreEntryPage() {
 
       const className = assignment.subjects?.class || assignment.class || "";
       const isJSSClass = ["JSS1", "JSS2", "JSS3"].includes(className);
+      const isSSSClass = ["SSS1", "SSS2", "SSS3"].includes(className);
 
       const first = Number(scoreData.first_test) || 0;
       const second = Number(scoreData.second_test) || 0;
       const exam = Number(scoreData.exam) || 0;
       const total = first + second + exam;
+      const prev =
+        prevTermScoresRef.current[selectedAssignment]?.[studentId] || {};
 
+      const term1 = Number(prev.term1 ?? 0);
+      const term2 = Number(prev.term2 ?? 0);
       const average = calculateAverage(studentId, scoreData);
       const comment = getCommentForScore(average, isJSSClass);
+      const grade = isSSSClass ? calculateGrade(average) : null;
 
       setAutoSaveStatus((prev) => ({
         ...prev,
@@ -348,6 +354,10 @@ export default function ScoreEntryPage() {
         second_test: second,
         exam,
         total,
+        term1_total: term1,
+        term2_total: term2,
+        average,
+        grade: isSSSClass ? grade : null,
         subject_comment: comment || null,
         submitted: submitted,
       };
