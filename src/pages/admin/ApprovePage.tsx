@@ -44,6 +44,7 @@ export default function ApprovePage() {
   const fetchData = async () => {
     if (!selectedClass || settingsLoading) return;
     setRefreshing(true);
+    await new Promise((r) => setTimeout(r, 300));
     const { data: studs } = await supabase.from('students').select('*').eq('class', selectedClass as any).order('full_name');
     setStudents(studs || []);
 
@@ -53,6 +54,8 @@ export default function ApprovePage() {
         supabase.from('reports').select('*').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any),
         supabase.from('scores').select('*, subjects(name, id)').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any).eq('submitted', true),
       ]);
+
+      console.log("Fetched scores:", scoresRes.data);
 
       const rMap: Record<string, any> = {};
       (reportsRes.data || []).forEach(r => { rMap[r.student_id] = r; });
@@ -123,7 +126,7 @@ export default function ApprovePage() {
 
       const { data } = await supabase.from('reports').insert({
         student_id: studentId,
-        term: settings.active_term as any,
+        term: settings.active_term as "First Term" | "Second Term" | "Third Term",
         session: settings.active_session,
         total_marks: totalMarks,
         average: Math.round(avg * 100) / 100,

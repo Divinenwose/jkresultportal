@@ -614,11 +614,15 @@ export default function ScoreEntryPage() {
     setSaving(true);
 
     try {
+      // ✅ FIX 1: flush pending autosaves FIRST
+      await flushPendingSaves();
+
       await Promise.all(
         students.map(async (student) => {
           const scoreData = scoreMapRef.current?.[student.id];
           if (!scoreData) return;
 
+          // ✅ ensures submitted = true
           await autoSaveStudent(student.id, scoreData, true);
         })
       );
