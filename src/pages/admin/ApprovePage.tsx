@@ -52,7 +52,7 @@ export default function ApprovePage() {
       const ids = studs.map(s => s.id);
       const [reportsRes, scoresRes] = await Promise.all([
         supabase.from('reports').select('*').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any),
-        supabase.from('scores').select('*, subjects(name, id)').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any).eq('submitted', true),
+        supabase.from('scores').select('*, subjects(name, id)').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any),
       ]);
 
       console.log("Fetched scores:", scoresRes.data);
