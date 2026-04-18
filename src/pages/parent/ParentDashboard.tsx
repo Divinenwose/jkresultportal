@@ -13,7 +13,7 @@ import { User, FileText, ChevronRight, UserPlus, UserMinus, Loader2, GraduationC
 import { Link } from "react-router-dom";
 
 const ALL_CLASSES = ["JSS1", "JSS2", "JSS3", "SS1", "SS2", "SS3"] as const;
-const MAX_CHILDREN = 3;
+const MAX_CHILDREN = 5;
 
 export default function ParentDashboard() {
   const { user } = useAuth();
@@ -42,9 +42,8 @@ export default function ParentDashboard() {
     setLoadingClass(cls);
     const { data, error } = await supabase
       .from('students')
-      .select('id, full_name, class, gender, spin')
+      .select('id, full_name, class, gender, spin, parent_user_id')
       .eq('class', cls as "JSS1" | "JSS2" | "JSS3" | "SS1" | "SS2" | "SS3")
-      .is('parent_user_id', null)
       .order('full_name');
     setLoadingClass(null);
     if (error) { toast.error(error.message); return; }
@@ -82,12 +81,13 @@ export default function ParentDashboard() {
     setClaiming(null);
     if (error) { toast.error(error.message); return; }
     toast.success(`${studentName} has been linked to your account!`);
-    // Remove from browse list
     setClassBrowse(prev => ({
       ...prev,
-      [activeTab]: (prev[activeTab] || []).filter(s => s.id !== studentId),
+      [activeTab]: (prev[activeTab] || []).map(s =>
+        s.id === studentId ? { ...s, parent_user_id: user.id } : s
+      ),
     }));
-    fetchChildren();
+    await fetchChildren();
   };
 
   const handleUnclaim = async (studentId: string, studentName: string) => {
@@ -118,7 +118,7 @@ export default function ParentDashboard() {
           <DialogTrigger asChild>
             <Button variant="outline" size="sm" disabled={atLimit}>
               <UserPlus className="h-4 w-4 mr-2" />
-              {atLimit ? "Limit Reached (3/3)" : "Claim a Child"}
+              {atLimit ? `Limit Reached (${MAX_CHILDREN}/${MAX_CHILDREN})` : "Claim a Child"}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
@@ -128,7 +128,7 @@ export default function ParentDashboard() {
               </DialogTitle>
             </DialogHeader>
             <p className="text-sm text-muted-foreground">
-              Browse students by class. Only unclaimed students are shown.
+              Browse students by class. Students who are already linked to a parent cannot be claimed.
               {children.length > 0 && (
                 <span className="ml-1 font-medium text-foreground">
                   ({children.length}/{MAX_CHILDREN} claimed)
@@ -158,11 +158,13 @@ export default function ParentDashboard() {
                       </div>
                     ) : !loadedClasses.has(cls) ? null : (classBrowse[cls] || []).length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-10">
-                        No unclaimed students in {cls}.
+                        No students in {cls}.
                       </p>
                     ) : (
                       <div className="space-y-2 pr-1">
-                        {(classBrowse[cls] || []).map(s => (
+                        {(classBrowse[cls] || []).map(s => {
+                          const alreadyClaimed = s.parent_user_id != null;
+                          return (
                           <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/40 transition-colors">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
@@ -176,15 +178,25 @@ export default function ParentDashboard() {
                             <Button
                               size="sm"
                               onClick={() => handleClaim(s.id, s.full_name)}
-                              disabled={claiming === s.id || atLimit}
+                              disabled={alreadyClaimed || claiming === s.id || atLimit}
                             >
-                              {claiming === s.id
-                                ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                : <UserPlus className="h-3 w-3 mr-1" />}
-                              Claim
+                              {alreadyClaimed ? (
+                                "Already claimed"
+                              ) : claiming === s.id ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                  Claim
+                                </>
+                              ) : (
+                                <>
+                                  <UserPlus className="h-3 w-3 mr-1" />
+                                  Claim
+                                </>
+                              )}
                             </Button>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </TabsContent>
