@@ -47,7 +47,7 @@ function getCommentForScore(average: number, isJSSClass: boolean): string {
 
 export default function ScoreEntryPage() {
   const { user } = useAuth();
-  const { settings } = useSettings();
+  const { settings, loading: settingsLoading } = useSettings();
 
   const [assignments, setAssignments] = useState<any[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<string>("");
@@ -134,7 +134,7 @@ export default function ScoreEntryPage() {
   const fetchIdRef = useRef(0);
 
   useEffect(() => {
-    if (!selectedAssignment || assignments.length === 0) return;
+    if (settingsLoading || !selectedAssignment || assignments.length === 0) return;
 
     const fetchId = ++fetchIdRef.current;
 
@@ -157,12 +157,15 @@ export default function ScoreEntryPage() {
       const studentIds = studs.map((student) => student.id);
 
       // CURRENT TERM SCORES
+      const term = settings.active_term as any;
+      const session = settings.active_session;
+
       const { data: existingScores } = await supabase
         .from("scores")
         .select("*")
         .eq("subject_id", assignment.subjects.id)
-        .eq("term", settings.active_term as any)
-        .eq("session", settings.active_session)
+        .eq("term", term)
+        .eq("session", session)
         .in("student_id", studentIds);
 
       const scoreLookup: Record<string, any> = {};
@@ -198,7 +201,7 @@ export default function ScoreEntryPage() {
           .select("id, student_id, total")
           .eq("subject_id", assignment.subjects.id)
           .eq("term", "First Term" as any)
-          .eq("session", settings.active_session)
+          .eq("session", session)
           .in("student_id", studentIds);
 
         termOneScores?.forEach((score) => {
@@ -220,7 +223,7 @@ export default function ScoreEntryPage() {
             .select("id, student_id, total")
             .eq("subject_id", assignment.subjects.id)
             .eq("term", "Second Term" as any)
-            .eq("session", settings.active_session)
+            .eq("session", session)
             .in("student_id", studentIds);
 
           termTwoScores?.forEach((score) => {
@@ -267,6 +270,7 @@ export default function ScoreEntryPage() {
     assignments,
     settings.active_term,
     settings.active_session,
+    settingsLoading,
     isSecondTerm,
     isThirdTerm,
     user
@@ -318,6 +322,8 @@ export default function ScoreEntryPage() {
 
   const autoSaveStudent = useCallback(
     async (studentId: string, scoreData: any, submitted = false) => {
+      if (settingsLoading) return;
+
       const assignment = assignments.find(
         (item) => item.id === selectedAssignment
       );
@@ -329,7 +335,6 @@ export default function ScoreEntryPage() {
       const first = Number(scoreData.first_test) || 0;
       const second = Number(scoreData.second_test) || 0;
       const exam = Number(scoreData.exam) || 0;
-      const total = first + second + exam;
 
       const average = calculateAverage(studentId, scoreData);
       const comment = getCommentForScore(average, isJSSClass);
@@ -339,17 +344,19 @@ export default function ScoreEntryPage() {
         [studentId]: "saving",
       }));
 
+      const term = settings.active_term as "First Term" | "Second Term" | "Third Term";
+      const session = settings.active_session;
+
       const payload = {
         student_id: studentId,
         subject_id: assignment.subjects.id as string,
-        term: settings.active_term as "First Term" | "Second Term" | "Third Term",
-        session: settings.active_session,
+        term,
+        session,
         first_test: first,
         second_test: second,
         exam,
-        total,
         subject_comment: comment || null,
-        submitted: submitted,
+        submitted,
       };
 
       const { data, error } = await supabase
@@ -365,6 +372,7 @@ export default function ScoreEntryPage() {
           ...prev,
           [studentId]: "error",
         }));
+        if (submitted) throw error;
         return;
       }
 
@@ -383,7 +391,7 @@ export default function ScoreEntryPage() {
         [studentId]: "saved",
       }));
     },
-    [assignments, selectedAssignment, settings]
+    [assignments, selectedAssignment, settings, settingsLoading]
   );
 
   const trackSave = useCallback((promise: Promise<void>) => {
@@ -393,6 +401,7 @@ export default function ScoreEntryPage() {
 
   const scheduleAutoSave = useCallback(
     (studentId: string, scoreData: any) => {
+      if (settingsLoading) return;
       if (autoSaveTimers.current[studentId]) {
         clearTimeout(autoSaveTimers.current[studentId]);
       }
@@ -401,7 +410,7 @@ export default function ScoreEntryPage() {
         void autoSaveStudent(studentId, scoreData, false);
       }, 1500);
     },
-    [autoSaveStudent]
+    [autoSaveStudent, settingsLoading]
   );
 
   const schedulePrevTermSave = (studentId: string, termKey: "term1" | "term2") => {
@@ -418,6 +427,7 @@ export default function ScoreEntryPage() {
 
   const autoSavePrevTerm = useCallback(
     async (studentId: string, termKey: "term1" | "term2", totalValue: number) => {
+      if (settingsLoading) return;
       const assignment = assignments.find((item) => item.id === selectedAssignment);
       if (!assignment) return;
 
@@ -431,12 +441,15 @@ export default function ScoreEntryPage() {
       const existingId =
         termKey === "term1" ? ids.term1Id : ids.term2Id;
 
+      const session = settings.active_session;
       const payload = {
         student_id: studentId,
         subject_id: assignment.subjects.id,
         term: termName as any,
-        session: settings.active_session,
-        total: totalValue,
+        session,
+        first_test: totalValue,
+        second_test: 0,
+        exam: 0,
         submitted: true,
       };
 
@@ -461,7 +474,7 @@ export default function ScoreEntryPage() {
 
       setSavedIndicator(studentId);
     },
-    [assignments, prevTermIds, selectedAssignment, setSavedIndicator, settings.active_session]
+    [assignments, prevTermIds, selectedAssignment, setSavedIndicator, settings.active_session, settingsLoading]
   );
 
   const commitPrevTermSave = useCallback(
@@ -601,9 +614,16 @@ export default function ScoreEntryPage() {
     );
     if (!assignment) return;
 
+    if (settingsLoading) {
+      toast.error("Settings are still loading. Please try again.");
+      return;
+    }
+
     setSaving(true);
 
     try {
+      await flushPendingSaves();
+
       await Promise.all(
         students.map(async (student) => {
           const scoreData = scoreMapRef.current?.[student.id];

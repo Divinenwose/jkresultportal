@@ -43,6 +43,9 @@ export default function ApprovePage() {
 
   const fetchData = async () => {
     if (!selectedClass || settingsLoading) return;
+    const term = settings.active_term;
+    const session = settings.active_session;
+
     setRefreshing(true);
     await new Promise((r) => setTimeout(r, 300));
     const { data: studs } = await supabase.from('students').select('*').eq('class', selectedClass as any).order('full_name');
@@ -51,11 +54,20 @@ export default function ApprovePage() {
     if (studs?.length) {
       const ids = studs.map(s => s.id);
       const [reportsRes, scoresRes] = await Promise.all([
-        supabase.from('reports').select('*').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any),
-        supabase.from('scores').select('*, subjects(name, id)').in('student_id', ids).eq('session', settings.active_session).eq('term', settings.active_term as any),
+        supabase.from('reports').select('*').in('student_id', ids).eq('session', session).eq('term', term as any),
+        supabase
+          .from('scores')
+          .select('*, subjects!scores_subject_id_fkey(id, name)')
+          .in('student_id', ids)
+          .eq('session', session)
+          .eq('term', term as any)
+          .eq('submitted', true),
       ]);
 
-      console.log("Fetched scores:", scoresRes.data);
+      if (scoresRes.error) {
+        console.error(scoresRes.error);
+        toast.error(scoresRes.error.message || 'Failed to load submitted scores');
+      }
 
       const rMap: Record<string, any> = {};
       (reportsRes.data || []).forEach(r => { rMap[r.student_id] = r; });
@@ -75,7 +87,7 @@ export default function ApprovePage() {
         const { data: t1 } = await supabase.from('scores')
           .select('student_id, subject_id, total')
           .in('student_id', ids)
-          .eq('session', settings.active_session)
+          .eq('session', session)
           .eq('term', 'First Term' as any);
 
         (t1 || []).forEach(s => {
@@ -90,7 +102,7 @@ export default function ApprovePage() {
           const { data: t2 } = await supabase.from('scores')
             .select('student_id, subject_id, total')
             .in('student_id', ids)
-            .eq('session', settings.active_session)
+            .eq('session', session)
             .eq('term', 'Second Term' as any);
 
           (t2 || []).forEach(s => {
@@ -112,7 +124,7 @@ export default function ApprovePage() {
 
   useEffect(() => {
     fetchData();
-  }, [selectedClass, settings, settingsLoading]);
+  }, [selectedClass, settings.active_term, settings.active_session, settingsLoading]);
 
   const handleCreateOrUpdateReport = async (studentId: string, field: string, value: any) => {
     const existing = reports[studentId];
