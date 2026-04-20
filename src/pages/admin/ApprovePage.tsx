@@ -186,15 +186,22 @@ export default function ApprovePage() {
       [studentId]: (prev[studentId] || []).filter((item) => item.id !== score.id),
     }));
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("scores")
       .delete()
       .eq("id", score.id)
-      .eq("submitted", true);
+      .eq("submitted", true)
+      .select("id");
 
     if (error) {
       setScores((prev) => ({ ...prev, [studentId]: previousStudentScores }));
       toast.error(error.message || "Failed to delete score");
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      setScores((prev) => ({ ...prev, [studentId]: previousStudentScores }));
+      toast.error("Delete permission is missing. Apply latest migration and retry.");
       return;
     }
 
