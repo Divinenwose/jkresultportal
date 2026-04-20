@@ -179,21 +179,33 @@ export default function ApprovePage() {
     const confirmed = window.confirm("Delete this submitted score?");
     if (!confirmed) return;
 
-    const { error } = await supabase
+    // Remove instantly from UI, then persist deletion in DB.
+    const previousStudentScores = scores[studentId] || [];
+    setScores((prev) => ({
+      ...prev,
+      [studentId]: (prev[studentId] || []).filter((item) => item.id !== score.id),
+    }));
+
+    const { data, error } = await supabase
       .from("scores")
       .delete()
-      .eq("student_id", score.student_id)
-      .eq("subject_id", score.subject_id)
-      .eq("term", settings.active_term as any)
-      .eq("session", settings.active_session)
-      .eq("submitted", true);
+      .eq("id", score.id)
+      .eq("submitted", true)
+      .select("id");
 
     if (error) {
+      setScores((prev) => ({ ...prev, [studentId]: previousStudentScores }));
       toast.error(error.message || "Failed to delete score");
       return;
     }
 
-    // Re-fetch from DB so UI always matches persisted state after delete.
+    if (!data || data.length === 0) {
+      setScores((prev) => ({ ...prev, [studentId]: previousStudentScores }));
+      toast.error("Could not delete score from database");
+      return;
+    }
+
+    // Re-fetch from DB so refresh state stays consistent.
     await fetchData();
     toast.success("Score deleted");
   };
