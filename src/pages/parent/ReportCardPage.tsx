@@ -31,6 +31,7 @@ export default function ReportCardPage() {
   const isSecondTerm = activeTerm === "Second Term";
   const isThirdTerm = activeTerm === "Third Term";
   const showCumulative = isSecondTerm || isThirdTerm;
+  const isJSS = ["JSS1", "JSS2", "JSS3"].includes(child?.class || "");
 
   useEffect(() => {
     if (!user) return;
@@ -216,7 +217,7 @@ export default function ReportCardPage() {
                         <th className="border p-1.5 text-center bg-blue-700">Average</th>
                       </>
                     )}
-                    <th className="border p-1.5 text-center">Grade</th>
+                    {!isJSS && <th className="border p-1.5 text-center">Grade</th>}
                     <th className="border p-1.5 text-left">Remark</th>
                   </tr>
                 </thead>
@@ -232,6 +233,7 @@ export default function ReportCardPage() {
                     else if (isThirdTerm) rowAvg = (currentTotal + term1 + term2) / 3;
 
                     const rowGrade = showCumulative ? calculateGrade(rowAvg) : (s.grade ?? calculateGrade(currentTotal));
+                    const rowRemark = s.subject_comment || "—";
 
                     return (
                       <tr key={s.id} className={i % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
@@ -253,8 +255,8 @@ export default function ReportCardPage() {
                             <td className="border p-1.5 text-center font-bold bg-blue-100">{rowAvg.toFixed(1)}</td>
                           </>
                         )}
-                        <td className="border p-1.5 text-center font-bold text-blue-700">{rowGrade}</td>
-                        <td className="border p-1.5 text-gray-600">{s.subject_comment || '—'}</td>
+                        {!isJSS && <td className="border p-1.5 text-center font-bold text-blue-700">{rowGrade}</td>}
+                        <td className="border p-1.5 text-gray-600">{rowRemark}</td>
                       </tr>
                     );
                   })}
@@ -265,7 +267,7 @@ export default function ReportCardPage() {
               <div className="flex gap-4 text-xs font-semibold mb-4 p-3 rounded bg-blue-50 border">
                 <div>Total Marks: <span className="text-blue-700">{totalMarks}</span></div>
                 <div>Average: <span className="text-blue-700">{average.toFixed(1)}</span></div>
-                <div>Overall Grade: <span className="text-blue-700">{report.overall_grade || calculateGrade(average)}</span></div>
+                {!isJSS && <div>Overall Grade: <span className="text-blue-700">{report.overall_grade || calculateGrade(average)}</span></div>}
               </div>
 
               {/* Comments */}
@@ -285,15 +287,16 @@ export default function ReportCardPage() {
                 )}
               </div>
 
-              {/* Grade Key */}
-              <div className="border rounded p-3">
-                <p className="text-[10px] font-bold mb-1 text-gray-600">GRADING KEY</p>
-                <div className="grid grid-cols-3 gap-1 text-[9px]">
-                  {GRADE_SCALE.map(g => (
-                    <div key={g.grade}><strong>{g.grade}</strong>: {g.min}–{g.max} ({g.remark})</div>
-                  ))}
+              {!isJSS && (
+                <div className="border rounded p-3">
+                  <p className="text-[10px] font-bold mb-1 text-gray-600">GRADING KEY</p>
+                  <div className="grid grid-cols-3 gap-1 text-[9px]">
+                    {GRADE_SCALE.map(g => (
+                      <div key={g.grade}><strong>{g.grade}</strong>: {g.min}–{g.max} ({g.remark})</div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </CardContent>
         </Card>

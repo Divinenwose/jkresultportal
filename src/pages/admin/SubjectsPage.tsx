@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 const JUNIOR_CLASSES = ['JSS1', 'JSS2', 'JSS3'] as const;
@@ -20,6 +20,10 @@ export default function SubjectsPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: '', level: 'Junior' as 'Junior' | 'Senior' });
   const [loading, setLoading] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingName, setEditingName] = useState("");
+  const [editName, setEditName] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
 
   const fetchSubjects = async () => {
     const { data } = await supabase.from('subjects').select('*').order('class').order('name');
@@ -53,6 +57,40 @@ export default function SubjectsPage() {
     fetchSubjects();
   };
 
+  const openEditDialog = (name: string) => {
+    setEditingName(name);
+    setEditName(name);
+    setEditOpen(true);
+  };
+
+  const handleEditSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const nextName = editName.trim();
+    if (!nextName) {
+      toast.error("Subject name is required");
+      return;
+    }
+    if (nextName === editingName) {
+      setEditOpen(false);
+      return;
+    }
+
+    setEditLoading(true);
+    const { error } = await supabase.from("subjects").update({ name: nextName }).eq("name", editingName);
+    setEditLoading(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success(`"${editingName}" updated to "${nextName}"`);
+    setEditOpen(false);
+    setEditingName("");
+    setEditName("");
+    fetchSubjects();
+  };
+
   // Group subjects by name for display
   const grouped = subjects.reduce((acc: Record<string, any[]>, s: any) => {
     if (!acc[s.name]) acc[s.name] = [];
@@ -63,6 +101,23 @@ export default function SubjectsPage() {
   return (
     <DashboardLayout title="Subjects">
       <div className="flex justify-end mb-4">
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-display">Edit Subject</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleEditSubject} className="space-y-4">
+              <div>
+                <Label>Subject Name</Label>
+                <Input value={editName} onChange={e => setEditName(e.target.value)} required />
+              </div>
+              <Button type="submit" className="w-full" disabled={editLoading}>
+                {editLoading ? "Saving..." : "Save Changes"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-1" /> Add Subject</Button></DialogTrigger>
           <DialogContent>
@@ -109,21 +164,31 @@ export default function SubjectsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete "{name}"?</AlertDialogTitle>
-                          <AlertDialogDescription>This will remove the subject from all classes. This action cannot be undone.</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteSubject(name)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <div className="flex items-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEditDialog(name)}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete "{name}"?</AlertDialogTitle>
+                            <AlertDialogDescription>This will remove the subject from all classes. This action cannot be undone.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteSubject(name)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

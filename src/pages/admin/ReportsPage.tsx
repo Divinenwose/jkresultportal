@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -154,13 +154,15 @@ export default function ReportsPage() {
                     No reports for {settings.active_term} {settings.active_session}
                   </TableCell>
                 </TableRow>
-              ) : filtered.map(r => (
-                <>
-                  <TableRow key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => toggleExpand(r)}>
+              ) : filtered.map(r => {
+                const isJSS = ["JSS1", "JSS2", "JSS3"].includes(r.students?.class || "");
+                return (
+                <Fragment key={r.id}>
+                  <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => toggleExpand(r)}>
                     <TableCell className="font-medium">{r.students?.full_name}</TableCell>
                     <TableCell>{r.students?.class}</TableCell>
                     <TableCell>{r.average?.toFixed(1) || '—'}</TableCell>
-                    <TableCell className="font-bold text-primary">{r.overall_grade || '—'}</TableCell>
+                    <TableCell className="font-bold text-primary">{isJSS ? '—' : (r.overall_grade || '—')}</TableCell>
                     <TableCell>
                       <Badge variant={r.approved ? "default" : "secondary"}>
                         {r.approved ? "Approved" : "Pending"}
@@ -199,7 +201,7 @@ export default function ReportsPage() {
                                     <td className="text-center py-1">{s.second_test ?? '—'}</td>
                                     <td className="text-center py-1">{s.exam ?? '—'}</td>
                                     <td className="text-center py-1 font-bold">{s.total ?? '—'}</td>
-                                    <td className="text-center py-1 font-bold text-primary">{s.grade ?? '—'}</td>
+                                    <td className="text-center py-1 font-bold text-primary">{isJSS ? '—' : (s.grade ?? '—')}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -209,8 +211,8 @@ export default function ReportsPage() {
                       </TableCell>
                     </TableRow>
                   )}
-                </>
-              ))}
+                </Fragment>
+              )})}
             </TableBody>
           </Table>
         </CardContent>
