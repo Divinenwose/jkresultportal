@@ -186,22 +186,15 @@ export default function ApprovePage() {
       [studentId]: (prev[studentId] || []).filter((item) => item.id !== score.id),
     }));
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("scores")
       .delete()
       .eq("id", score.id)
-      .eq("submitted", true)
-      .select("id");
+      .eq("submitted", true);
 
     if (error) {
       setScores((prev) => ({ ...prev, [studentId]: previousStudentScores }));
       toast.error(error.message || "Failed to delete score");
-      return;
-    }
-
-    if (!data || data.length === 0) {
-      setScores((prev) => ({ ...prev, [studentId]: previousStudentScores }));
-      toast.error("Could not delete score from database");
       return;
     }
 
