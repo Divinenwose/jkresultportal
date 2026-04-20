@@ -175,20 +175,26 @@ export default function ApprovePage() {
     toast.success("Report approved!");
   };
 
-  const handleDeleteScore = async (studentId: string, scoreId: string) => {
+  const handleDeleteScore = async (studentId: string, score: any) => {
     const confirmed = window.confirm("Delete this submitted score?");
     if (!confirmed) return;
 
-    const { error } = await supabase.from("scores").delete().eq("id", scoreId);
+    const { error } = await supabase
+      .from("scores")
+      .delete()
+      .eq("student_id", score.student_id)
+      .eq("subject_id", score.subject_id)
+      .eq("term", settings.active_term as any)
+      .eq("session", settings.active_session)
+      .eq("submitted", true);
+
     if (error) {
       toast.error(error.message || "Failed to delete score");
       return;
     }
 
-    setScores((prev) => ({
-      ...prev,
-      [studentId]: (prev[studentId] || []).filter((score) => score.id !== scoreId),
-    }));
+    // Re-fetch from DB so UI always matches persisted state after delete.
+    await fetchData();
     toast.success("Score deleted");
   };
 
@@ -358,7 +364,7 @@ export default function ApprovePage() {
                                       variant="ghost"
                                       size="icon"
                                       className="h-6 w-6 text-destructive hover:text-destructive"
-                                      onClick={() => handleDeleteScore(student.id, s.id)}
+                                      onClick={() => handleDeleteScore(student.id, s)}
                                       disabled={isApproved}
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
