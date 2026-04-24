@@ -12,11 +12,11 @@ export const CURRENT_TERM: SchoolTerm = "First Term";
 
 export const GRADE_SCALE = [
   { min: 75, max: 100, grade: 'A1', remark: 'Excellent' },
-  { min: 70, max: 74, grade: 'B2', remark: 'Very Good' },
-  { min: 65, max: 69, grade: 'B3', remark: 'Good' },
-  { min: 50, max: 64, grade: 'C4', remark: 'Credit' },
-  { min: 40, max: 49, grade: 'D7', remark: 'Pass' },
-  { min: 0, max: 39, grade: 'F9', remark: 'Fail' },
+  { min: 70, max: 74.99, grade: 'B2', remark: 'Very Good' },
+  { min: 65, max: 69.99, grade: 'B3', remark: 'Good' },
+  { min: 50, max: 64.99, grade: 'C4', remark: 'Credit' },
+  { min: 40, max: 49.99, grade: 'D7', remark: 'Pass' },
+  { min: 0, max: 39.99, grade: 'F9', remark: 'Fail' },
 ];
 
 export function calculateGrade(total: number): string {
