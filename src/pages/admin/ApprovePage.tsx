@@ -13,6 +13,28 @@ import { CLASSES, calculateGrade, GRADE_SCALE } from "@/lib/constants";
 import { useSettings } from "@/hooks/useSettings";
 import { CheckCircle, RefreshCw, Trash2 } from "lucide-react";
 
+const teacherComments = [
+  "is generally well-behaved and relates well with others.",
+  "shows good conduct and responds positively to guidance.",
+  "maintains a calm and friendly attitude in class.",
+  "is respectful and cooperates well with classmates.",
+  "demonstrates acceptable behavior and continues to improve.",
+  "is polite and follows instructions most of the time.",
+  "shows steady improvement in behavior—keep it up.",
+  "has a pleasant attitude and interacts well with peers."
+];
+
+const principalComments = [
+  "Good performance this term; keep it up.",
+  "A commendable effort; aim for higher achievement.",
+  "Fair performance; more effort is encouraged.",
+  "Steady progress observed; keep working hard.",
+  "Good result; strive for improvement next term.",
+  "An encouraging performance; maintain consistency.",
+  "Satisfactory performance; greater focus is needed.",
+  "Shows potential; continued effort will improve results."
+];
+
 function getComment(average: number, isJSS: boolean): string {
   if (isJSS) {
     if (average >= 80) return "Excellent";
@@ -276,11 +298,46 @@ export default function ApprovePage() {
 
                   <div>
                     <Label className="text-xs">Class Teacher Comment</Label>
-                    <Textarea value={report?.teacher_comment || ''} onChange={e => handleCreateOrUpdateReport(student.id, 'teacher_comment', e.target.value)} disabled={isApproved} className="text-sm min-h-[60px]" />
+                    <Select
+                      value={report?.teacher_comment || ""}
+                      onValueChange={(value) => {
+                        const pronoun = student.gender?.toLowerCase() === "female" ? "She" : "He";
+                        handleCreateOrUpdateReport(student.id, "teacher_comment", `${pronoun} ${value}`);
+                      }}
+                      disabled={isApproved}
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="Select Teacher Comment" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teacherComments.map((comment, index) => (
+                          <SelectItem key={index} value={comment}>
+                            {student.gender?.toLowerCase() === "female" ? "She" : "He"} {comment}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <Label className="text-xs">Principal Comment</Label>
-                    <Textarea value={report?.principal_comment || ''} onChange={e => handleCreateOrUpdateReport(student.id, 'principal_comment', e.target.value)} disabled={isApproved} className="text-sm min-h-[60px]" />
+                    <Select
+                      value={report?.principal_comment || ""}
+                      onValueChange={(value) =>
+                        handleCreateOrUpdateReport(student.id, "principal_comment", value)
+                      }
+                      disabled={isApproved}
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="Select Principal Comment" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {principalComments.map((comment, index) => (
+                          <SelectItem key={index} value={comment}>
+                            {comment}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <Label className="text-xs">Next Term Begins</Label>
