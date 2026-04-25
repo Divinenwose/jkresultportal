@@ -301,8 +301,7 @@ export default function ApprovePage() {
                     <Select
                       value={report?.teacher_comment || ""}
                       onValueChange={(value) => {
-                        const pronoun = student.gender?.toLowerCase() === "female" ? "She" : "He";
-                        handleCreateOrUpdateReport(student.id, "teacher_comment", `${pronoun} ${value}`);
+                        handleCreateOrUpdateReport(student.id, "teacher_comment", value);
                       }}
                       disabled={isApproved}
                     >
