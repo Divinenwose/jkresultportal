@@ -37,9 +37,9 @@ const principalComments = [
 
 function getComment(average: number, isJSS: boolean): string {
   if (isJSS) {
-    if (average >= 80) return "Excellent";
+    if (average >= 75) return "Excellent";
     if (average >= 70) return "Very Good";
-    if (average >= 60) return "Good";
+    if (average >= 65) return "Good";
     if (average >= 50) return "Fair";
     if (average >= 40) return "Pass";
     return "Fail";
