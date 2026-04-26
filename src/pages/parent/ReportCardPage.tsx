@@ -232,8 +232,11 @@ export default function ReportCardPage() {
                     if (isSecondTerm) rowAvg = (currentTotal + term1) / 2;
                     else if (isThirdTerm) rowAvg = (currentTotal + term1 + term2) / 3;
 
-                    const rowGrade = showCumulative ? calculateGrade(rowAvg) : (s.grade ?? calculateGrade(currentTotal));
-                    const rowRemark = s.subject_comment || "—";
+                    const rowGrade = calculateGrade(showCumulative ? rowAvg : currentTotal);
+                    const rowRemark = (() => {
+      const grade = calculateGrade(showCumulative ? rowAvg : currentTotal);
+      return GRADE_SCALE.find((g) => g.grade === grade)?.remark || "—";
+    })();
 
                     return (
                       <tr key={s.id} className={i % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
@@ -274,7 +277,12 @@ export default function ReportCardPage() {
               <div className="space-y-2 text-xs mb-4">
                 <div className="p-2 border rounded">
                   <span className="text-gray-500">Class Teacher's Comment:</span>
-                  <p className="font-medium mt-0.5">{report.teacher_comment || '—'}</p>
+                  <p className="font-medium mt-0.5">
+                    {report.teacher_comment ? 
+                      `${child.gender?.toLowerCase() === "female" ? "She" : "He"} ${report.teacher_comment}` : 
+                      '—'
+                    }
+                  </p>
                 </div>
                 <div className="p-2 border rounded">
                   <span className="text-gray-500">Principal's Comment:</span>

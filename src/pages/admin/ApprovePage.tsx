@@ -36,14 +36,6 @@ const principalComments = [
 ];
 
 function getComment(average: number, isJSS: boolean): string {
-  if (isJSS) {
-    if (average >= 75) return "Excellent";
-    if (average >= 70) return "Very Good";
-    if (average >= 65) return "Good";
-    if (average >= 50) return "Credit";
-    if (average >= 40) return "Pass";
-    return "Fail";
-  }
   const grade = calculateGrade(average);
   return GRADE_SCALE.find((g) => g.grade === grade)?.remark ?? "Fail";
 }
@@ -197,6 +189,7 @@ export default function ApprovePage() {
     toast.success("Report approved!");
   };
 
+  
   const handleDeleteScore = async (studentId: string, score: any) => {
     const confirmed = window.confirm("Delete this submitted score?");
     if (!confirmed) return;
@@ -288,11 +281,11 @@ export default function ApprovePage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs">Attendance - Days Opened</Label>
-                      <Input type="number" min={0} value={report?.days_opened || ''} onChange={e => handleCreateOrUpdateReport(student.id, 'days_opened', parseInt(e.target.value) || 0)} disabled={isApproved} className="h-8 text-sm" />
+                      <Input type="number" min={0} value={report?.days_opened || ''} onChange={e => handleCreateOrUpdateReport(student.id, 'days_opened', parseInt(e.target.value) || 0)} className="h-8 text-sm" />
                     </div>
                     <div>
                       <Label className="text-xs">Days Present</Label>
-                      <Input type="number" min={0} value={report?.days_present || ''} onChange={e => handleCreateOrUpdateReport(student.id, 'days_present', parseInt(e.target.value) || 0)} disabled={isApproved} className="h-8 text-sm" />
+                      <Input type="number" min={0} value={report?.days_present || ''} onChange={e => handleCreateOrUpdateReport(student.id, 'days_present', parseInt(e.target.value) || 0)} className="h-8 text-sm" />
                     </div>
                   </div>
 
@@ -303,7 +296,6 @@ export default function ApprovePage() {
                       onValueChange={(value) => {
                         handleCreateOrUpdateReport(student.id, "teacher_comment", value);
                       }}
-                      disabled={isApproved}
                     >
                       <SelectTrigger className="h-8 text-sm">
                         <SelectValue placeholder="Select Teacher Comment" />
@@ -324,7 +316,6 @@ export default function ApprovePage() {
                       onValueChange={(value) =>
                         handleCreateOrUpdateReport(student.id, "principal_comment", value)
                       }
-                      disabled={isApproved}
                     >
                       <SelectTrigger className="h-8 text-sm">
                         <SelectValue placeholder="Select Principal Comment" />
@@ -340,7 +331,7 @@ export default function ApprovePage() {
                   </div>
                   <div>
                     <Label className="text-xs">Next Term Begins</Label>
-                    <Input type="date" value={report?.next_term_begins || ''} onChange={e => handleCreateOrUpdateReport(student.id, 'next_term_begins', e.target.value)} disabled={isApproved} className="h-8 text-sm" />
+                    <Input type="date" value={report?.next_term_begins || ''} onChange={e => handleCreateOrUpdateReport(student.id, 'next_term_begins', e.target.value)} className="h-8 text-sm" />
                   </div>
 
                   {/* Report Card Preview */}
@@ -433,7 +424,6 @@ export default function ApprovePage() {
                                       size="icon"
                                       className="h-6 w-6 text-destructive hover:text-destructive"
                                       onClick={() => handleDeleteScore(student.id, s)}
-                                      disabled={isApproved}
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
@@ -447,12 +437,10 @@ export default function ApprovePage() {
                     )}
                   </div>
 
-                  {!isApproved && (
-                    <Button onClick={() => handleApprove(student.id)} disabled={saving === student.id} size="sm">
-                      {saving === student.id ? "Approving..." : "Approve Report"}
-                    </Button>
-                  )}
-                </CardContent>
+                  <Button onClick={() => handleApprove(student.id)} disabled={saving === student.id} size="sm">
+                    {saving === student.id ? "Updating..." : isApproved ? "Update Report" : "Approve Report"}
+                  </Button>
+                    </CardContent>
               </Card>
             );
           })}

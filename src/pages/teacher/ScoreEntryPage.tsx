@@ -868,11 +868,7 @@ export default function ScoreEntryPage() {
   );
 }
 function autoComment(average: number): string {
-  if (average >= 75) return "Excellent";
-  if (average >= 70) return "Very Good";
-  if (average >= 65) return "Good";
-  if (average >= 50) return "Credit";
-  if (average >= 40) return "Pass";
-  return "Fail";
+  const grade = calculateGrade(average);
+  return GRADE_SCALE.find((item) => item.grade === grade)?.remark ?? "Fail";
 }
 
