@@ -868,10 +868,10 @@ export default function ScoreEntryPage() {
   );
 }
 function autoComment(average: number): string {
-  if (average >= 80) return "Excellent";
+  if (average >= 75) return "Excellent";
   if (average >= 70) return "Very Good";
-  if (average >= 60) return "Good";
-  if (average >= 50) return "Fair";
+  if (average >= 65) return "Good";
+  if (average >= 50) return "Credit";
   if (average >= 40) return "Pass";
   return "Fail";
 }
