@@ -105,12 +105,37 @@ export default function ReportCardPage() {
     if (!reportRef.current) return;
     setDownloading(true);
     try {
-      const canvas = await html2canvas(reportRef.current, { scale: 2, useCORS: true });
+      const canvas = await html2canvas(reportRef.current, { 
+        scale: 2, 
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      
+      // A4 dimensions in mm
+      const pdfWidth = 210;
+      const pdfHeight = 297;
+      
+      // Calculate image dimensions to fit the PDF page
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      // If image height exceeds PDF height, scale it down
+      let finalWidth = imgWidth;
+      let finalHeight = imgHeight;
+      
+      if (imgHeight > pdfHeight) {
+        finalHeight = pdfHeight;
+        finalWidth = (canvas.width * pdfHeight) / canvas.height;
+      }
+      
+      // Center the image on the page
+      const xOffset = (pdfWidth - finalWidth) / 2;
+      const yOffset = (pdfHeight - finalHeight) / 2;
+      
+      pdf.addImage(imgData, 'PNG', xOffset, yOffset, finalWidth, finalHeight);
       pdf.save(`Report_${child?.full_name}_${settings.active_term}_${settings.active_session}.pdf`);
     } catch (e) {
       console.error(e);
