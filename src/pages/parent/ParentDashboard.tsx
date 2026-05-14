@@ -92,12 +92,29 @@ export default function ParentDashboard() {
 
   const handleUnclaim = async (studentId: string, studentName: string) => {
     if (!user) return;
+    
+    // Prevent multiple unlinks of the same child
+    if (claiming === studentId) {
+      toast.error('Already unlinking this child. Please wait for the current operation to complete.');
+      return;
+    }
+    
+    // Check if child is currently linked to this user
+    const child = children.find(c => c.id === studentId);
+    if (!child || child.parent_user_id !== user.id) {
+      toast.error('This child is not linked to your account.');
+      return;
+    }
+    
     const { error } = await supabase
       .from('students')
       .update({ parent_user_id: null })
       .eq('id', studentId)
       .eq('parent_user_id', user.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { 
+      toast.error(error.message); 
+      return; 
+    }
     toast.success(`${studentName} has been unlinked from your account.`);
     fetchChildren();
   };

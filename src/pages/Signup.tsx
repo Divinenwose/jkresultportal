@@ -53,7 +53,7 @@ export default function Signup() {
           <div className="flex justify-center mb-4">
             <img src={schoolLogo} alt="" aria-hidden="true" className="w-20 h-20 rounded-full object-cover shadow-lg ring-4 ring-secondary" />
           </div>
-          <h1 className="text-xl font-display font-bold text-foreground">{SCHOOL_NAME} — Create Account</h1>
+          <h1 className="text-xl font-display font-bold text-foreground">{SCHOOL_NAME}</h1>
           <p className="text-xs text-muted-foreground italic mt-1">"{SCHOOL_MOTTO}"</p>
           <div className="flex items-center justify-center gap-1.5 mt-3 text-primary">
             <GraduationCap className="h-4 w-4" />
