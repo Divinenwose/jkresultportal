@@ -41,9 +41,9 @@ export default function Login() {
       <Card className="w-full max-w-md shadow-2xl border-0">
         <CardHeader className="text-center pb-2 pt-8">
           <div className="flex justify-center mb-4">
-            <img src={schoolLogo} alt="School Logo" className="w-20 h-20 rounded-full object-cover shadow-lg ring-4 ring-secondary" />
+            <img src={schoolLogo} alt="" aria-hidden="true" className="w-20 h-20 rounded-full object-cover shadow-lg ring-4 ring-secondary" />
           </div>
-          <h1 className="text-xl font-display font-bold text-foreground">{SCHOOL_NAME}</h1>
+          <h1 className="text-xl font-display font-bold text-foreground">{SCHOOL_NAME} — Sign In</h1>
           <p className="text-xs text-muted-foreground italic mt-1">"{SCHOOL_MOTTO}"</p>
           <div className="flex items-center justify-center gap-1.5 mt-3 text-primary">
             <GraduationCap className="h-4 w-4" />
@@ -77,6 +77,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
