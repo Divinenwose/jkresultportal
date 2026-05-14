@@ -1,0 +1,13 @@
+# JKIC Result Portal
+
+> Student result management portal for John Kennedy International College — a Nigerian secondary school serving JSS1 to SS3. Admins, teachers, and parents access term-based academic reports.
+
+## Pages
+
+- [Home](/): Portal landing page.
+- [Sign In](/login): Account login for admins, teachers, and parents.
+- [Sign Up](/signup): Create a new portal account.
+
+## Optional
+
+- [Verify Email](/verify-email): Email verification step after signup.

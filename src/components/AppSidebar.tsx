@@ -52,7 +52,7 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r-0">
       <div className="p-4 flex items-center gap-3 border-b border-sidebar-border">
-        <img src={schoolLogo} alt="School Logo" className="w-10 h-10 rounded-full object-cover" />
+        <img src={schoolLogo} alt="" aria-hidden="true" className="w-10 h-10 rounded-full object-cover" />
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold text-sidebar-foreground truncate">{SCHOOL_NAME}</p>
           <p className="text-[10px] text-sidebar-foreground/60 capitalize">{role} Portal</p>
