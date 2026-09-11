@@ -43,15 +43,36 @@ export default function ReportsPage() {
     fetch();
   }, [settings, settingsLoading]);
 
-  const handleSaveSettings = async () => {
+  const sessionChanged = pendingSession !== settings.active_session;
+
+  const applySettings = async (promote: boolean) => {
     setSavingTerm(true);
+    let promoMsg = "";
+    if (promote) {
+      const { data, error: rpcError } = await supabase.rpc('promote_students', { _new_session: pendingSession });
+      if (rpcError) {
+        setSavingTerm(false);
+        toast.error(rpcError.message);
+        return;
+      }
+      const row: any = Array.isArray(data) ? data[0] : data;
+      promoMsg = ` — ${row?.promoted ?? 0} moved up, ${row?.graduated ?? 0} graduated`;
+    }
     const { error } = await updateSettings({ active_term: pendingTerm, active_session: pendingSession });
     setSavingTerm(false);
     if (error) {
       toast.error("Failed to update term settings");
     } else {
-      toast.success(`Active term updated to ${pendingTerm} ${pendingSession}`);
+      toast.success(`Active term updated to ${pendingTerm} ${pendingSession}${promoMsg}`);
     }
+  };
+
+  const handleSaveSettings = async () => {
+    if (sessionChanged) {
+      setConfirmOpen(true);
+      return;
+    }
+    await applySettings(false);
   };
 
   const fetchScores = async (reportId: string, studentId: string) => {
