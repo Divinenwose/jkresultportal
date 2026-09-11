@@ -150,6 +150,28 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
 
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start the {pendingSession} session?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Every student moves up one class (JSS1 to JSS2, JSS2 to JSS3, JSS3 to SS1, SS1 to SS2, SS2 to SS3),
+              and SS3 students are marked as graduated and moved to the Graduated list.
+              All past results are kept, and this can safely be run only once for {pendingSession}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void applySettings(false)}>
+              Change session only
+            </AlertDialogAction>
+            <AlertDialogAction onClick={() => void applySettings(true)}>
+              Promote students &amp; change session
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="flex justify-end mb-4">
         <Select value={filterClass} onValueChange={setFilterClass}>
           <SelectTrigger className="w-36"><SelectValue placeholder="All Classes" /></SelectTrigger>
