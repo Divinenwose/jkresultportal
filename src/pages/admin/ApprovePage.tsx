@@ -62,7 +62,7 @@ export default function ApprovePage() {
 
     setRefreshing(true);
     await new Promise((r) => setTimeout(r, 300));
-    const { data: studs } = await supabase.from('students').select('*').eq('class', selectedClass as any).order('full_name');
+    const { data: studs } = await supabase.from('students').select('*').eq('class', selectedClass as any).eq('graduated', false).order('full_name');
     setStudents(studs || []);
 
     if (studs?.length) {

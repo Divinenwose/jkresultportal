@@ -11,6 +11,10 @@ import { CLASSES, TERMS } from "@/lib/constants";
 import { useSettings } from "@/hooks/useSettings";
 import { toast } from "sonner";
 import { Settings, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function ReportsPage() {
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
@@ -21,6 +25,7 @@ export default function ReportsPage() {
   const [savingTerm, setSavingTerm] = useState(false);
   const [pendingTerm, setPendingTerm] = useState<string>("");
   const [pendingSession, setPendingSession] = useState<string>("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!settingsLoading) {
@@ -43,15 +48,36 @@ export default function ReportsPage() {
     fetch();
   }, [settings, settingsLoading]);
 
-  const handleSaveSettings = async () => {
+  const sessionChanged = pendingSession !== settings.active_session;
+
+  const applySettings = async (promote: boolean) => {
     setSavingTerm(true);
+    let promoMsg = "";
+    if (promote) {
+      const { data, error: rpcError } = await supabase.rpc('promote_students', { _new_session: pendingSession });
+      if (rpcError) {
+        setSavingTerm(false);
+        toast.error(rpcError.message);
+        return;
+      }
+      const row: any = Array.isArray(data) ? data[0] : data;
+      promoMsg = ` — ${row?.promoted ?? 0} moved up, ${row?.graduated ?? 0} graduated`;
+    }
     const { error } = await updateSettings({ active_term: pendingTerm, active_session: pendingSession });
     setSavingTerm(false);
     if (error) {
       toast.error("Failed to update term settings");
     } else {
-      toast.success(`Active term updated to ${pendingTerm} ${pendingSession}`);
+      toast.success(`Active term updated to ${pendingTerm} ${pendingSession}${promoMsg}`);
     }
+  };
+
+  const handleSaveSettings = async () => {
+    if (sessionChanged) {
+      setConfirmOpen(true);
+      return;
+    }
+    await applySettings(false);
   };
 
   const fetchScores = async (reportId: string, studentId: string) => {
@@ -123,6 +149,28 @@ export default function ReportsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start the {pendingSession} session?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Every student moves up one class (JSS1 to JSS2, JSS2 to JSS3, JSS3 to SS1, SS1 to SS2, SS2 to SS3),
+              and SS3 students are marked as graduated and moved to the Graduated list.
+              All past results are kept, and this can safely be run only once for {pendingSession}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void applySettings(false)}>
+              Change session only
+            </AlertDialogAction>
+            <AlertDialogAction onClick={() => void applySettings(true)}>
+              Promote students &amp; change session
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="flex justify-end mb-4">
         <Select value={filterClass} onValueChange={setFilterClass}>

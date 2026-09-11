@@ -24,7 +24,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       const [studentsRes, teachersRes, subjectsRes, reportsRes] = await Promise.all([
-        supabase.from('students').select('id, class'),
+        supabase.from('students').select('id, class').eq('graduated', false),
         supabase.from('user_roles').select('id').eq('role', 'teacher'),
         supabase.from('subjects').select('id'),
         supabase.from('reports').select('id').eq('approved', false),

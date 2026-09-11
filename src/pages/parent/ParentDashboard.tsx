@@ -44,6 +44,7 @@ export default function ParentDashboard() {
       .from('students')
       .select('id, full_name, class, gender, spin, parent_user_id')
       .eq('class', cls as "JSS1" | "JSS2" | "JSS3" | "SS1" | "SS2" | "SS3")
+      .eq('graduated', false)
       .order('full_name');
     setLoadingClass(null);
     if (error) { toast.error(error.message); return; }

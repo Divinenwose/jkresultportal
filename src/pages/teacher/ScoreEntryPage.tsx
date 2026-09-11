@@ -112,6 +112,7 @@ export default function ScoreEntryPage() {
         .from("students")
         .select("*")
         .eq("class", assignment.class)
+        .eq("graduated", false)
         .order("full_name");
 
       if (fetchId !== fetchIdRef.current) return;
@@ -147,6 +148,7 @@ export default function ScoreEntryPage() {
         .from("students")
         .select("*")
         .eq("class", assignment.class)
+        .eq("graduated", false)
         .order("full_name");
 
       setStudents(studs || []);

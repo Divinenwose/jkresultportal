@@ -28,9 +28,12 @@ export default function StudentsPage() {
   const [editForm, setEditForm] = useState({ full_name: '', gender: 'Male', date_of_birth: '', class: 'JSS1' });
   const [editLoading, setEditLoading] = useState(false);
 
+  const showingGraduated = filterClass === 'graduated';
+
   const fetchStudents = async () => {
     let query = supabase.from('students').select('*').order('full_name');
-    if (filterClass && filterClass !== 'all') query = query.eq('class', filterClass as any);
+    query = query.eq('graduated', showingGraduated);
+    if (filterClass && filterClass !== 'all' && !showingGraduated) query = query.eq('class', filterClass as any);
     const { data } = await query;
     setStudents(data || []);
   };
@@ -116,6 +119,7 @@ export default function StudentsPage() {
           <SelectContent>
             <SelectItem value="all">All Classes</SelectItem>
             {CLASSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            <SelectItem value="graduated">Graduated</SelectItem>
           </SelectContent>
         </Select>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -202,7 +206,14 @@ export default function StudentsPage() {
                 <TableRow key={s.id}>
                   <TableCell className="font-medium">{s.full_name}</TableCell>
                   <TableCell>{s.gender}</TableCell>
-                  <TableCell><span className="px-2 py-0.5 bg-secondary rounded text-xs font-medium">{s.class}</span></TableCell>
+                  <TableCell>
+                    <span className="px-2 py-0.5 bg-secondary rounded text-xs font-medium">{s.class}</span>
+                    {s.graduated && (
+                      <span className="ml-2 px-2 py-0.5 bg-primary/10 text-primary rounded text-xs font-medium">
+                        Graduated{s.graduated_session ? ` ${s.graduated_session}` : ''}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-muted-foreground text-sm">{s.date_of_birth || '—'}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
