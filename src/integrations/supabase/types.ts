@@ -197,9 +197,12 @@ export type Database = {
           date_of_birth: string | null
           full_name: string
           gender: string
+          graduated: boolean
+          graduated_session: string | null
           id: string
           parent_user_id: string | null
           photo_url: string | null
+          promoted_session: string | null
           spin: string
           updated_at: string
         }
@@ -209,9 +212,12 @@ export type Database = {
           date_of_birth?: string | null
           full_name: string
           gender: string
+          graduated?: boolean
+          graduated_session?: string | null
           id?: string
           parent_user_id?: string | null
           photo_url?: string | null
+          promoted_session?: string | null
           spin: string
           updated_at?: string
         }
@@ -221,9 +227,12 @@ export type Database = {
           date_of_birth?: string | null
           full_name?: string
           gender?: string
+          graduated?: boolean
+          graduated_session?: string | null
           id?: string
           parent_user_id?: string | null
           photo_url?: string | null
+          promoted_session?: string | null
           spin?: string
           updated_at?: string
         }
@@ -314,6 +323,13 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      promote_students: {
+        Args: { _new_session: string }
+        Returns: {
+          graduated: number
+          promoted: number
+        }[]
       }
     }
     Enums: {
