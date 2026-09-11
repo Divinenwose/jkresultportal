@@ -206,7 +206,14 @@ export default function StudentsPage() {
                 <TableRow key={s.id}>
                   <TableCell className="font-medium">{s.full_name}</TableCell>
                   <TableCell>{s.gender}</TableCell>
-                  <TableCell><span className="px-2 py-0.5 bg-secondary rounded text-xs font-medium">{s.class}</span></TableCell>
+                  <TableCell>
+                    <span className="px-2 py-0.5 bg-secondary rounded text-xs font-medium">{s.class}</span>
+                    {s.graduated && (
+                      <span className="ml-2 px-2 py-0.5 bg-primary/10 text-primary rounded text-xs font-medium">
+                        Graduated{s.graduated_session ? ` ${s.graduated_session}` : ''}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-muted-foreground text-sm">{s.date_of_birth || '—'}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
