@@ -11,6 +11,10 @@ import { CLASSES, TERMS } from "@/lib/constants";
 import { useSettings } from "@/hooks/useSettings";
 import { toast } from "sonner";
 import { Settings, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function ReportsPage() {
   const { settings, loading: settingsLoading, updateSettings } = useSettings();
@@ -21,6 +25,7 @@ export default function ReportsPage() {
   const [savingTerm, setSavingTerm] = useState(false);
   const [pendingTerm, setPendingTerm] = useState<string>("");
   const [pendingSession, setPendingSession] = useState<string>("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!settingsLoading) {
