@@ -119,6 +119,7 @@ export default function StudentsPage() {
           <SelectContent>
             <SelectItem value="all">All Classes</SelectItem>
             {CLASSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            <SelectItem value="graduated">Graduated</SelectItem>
           </SelectContent>
         </Select>
         <Dialog open={open} onOpenChange={setOpen}>
