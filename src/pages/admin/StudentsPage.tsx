@@ -28,9 +28,12 @@ export default function StudentsPage() {
   const [editForm, setEditForm] = useState({ full_name: '', gender: 'Male', date_of_birth: '', class: 'JSS1' });
   const [editLoading, setEditLoading] = useState(false);
 
+  const showingGraduated = filterClass === 'graduated';
+
   const fetchStudents = async () => {
     let query = supabase.from('students').select('*').order('full_name');
-    if (filterClass && filterClass !== 'all') query = query.eq('class', filterClass as any);
+    query = query.eq('graduated', showingGraduated);
+    if (filterClass && filterClass !== 'all' && !showingGraduated) query = query.eq('class', filterClass as any);
     const { data } = await query;
     setStudents(data || []);
   };
