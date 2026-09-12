@@ -34,6 +34,8 @@ export default function ReportsPage() {
     }
   }, [settingsLoading, settings]);
 
+  const [histClass, setHistClass] = useState<Record<string, string>>({});
+
   useEffect(() => {
     if (settingsLoading) return;
     const fetch = async () => {
@@ -44,11 +46,27 @@ export default function ReportsPage() {
         .eq('term', settings.active_term as any)
         .order('created_at', { ascending: false });
       setReports(data || []);
+      setScores({});
+
+      // Derive the class each student was in during this session/term
+      const { data: sc } = await supabase
+        .from('scores')
+        .select('student_id, subjects(class)')
+        .eq('session', settings.active_session)
+        .eq('term', settings.active_term as any);
+      const map: Record<string, string> = {};
+      (sc || []).forEach((row: any) => {
+        const cls = row.subjects?.class;
+        if (cls && !map[row.student_id]) map[row.student_id] = cls;
+      });
+      setHistClass(map);
     };
     fetch();
   }, [settings, settingsLoading]);
 
+  const yearOf = (s: string) => parseInt(s?.split('/')[0] || '0', 10);
   const sessionChanged = pendingSession !== settings.active_session;
+  const sessionAdvanced = yearOf(pendingSession) > yearOf(settings.active_session);
 
   const applySettings = async (promote: boolean) => {
     setSavingTerm(true);
@@ -73,7 +91,7 @@ export default function ReportsPage() {
   };
 
   const handleSaveSettings = async () => {
-    if (sessionChanged) {
+    if (sessionAdvanced) {
       setConfirmOpen(true);
       return;
     }
@@ -101,7 +119,8 @@ export default function ReportsPage() {
     }
   };
 
-  const filtered = filterClass === 'all' ? reports : reports.filter(r => r.students?.class === filterClass);
+  const classOf = (r: any) => histClass[r.student_id] || r.students?.class || '';
+  const filtered = filterClass === 'all' ? reports : reports.filter(r => classOf(r) === filterClass);
 
   return (
     <DashboardLayout title="Reports">
@@ -203,12 +222,13 @@ export default function ReportsPage() {
                   </TableCell>
                 </TableRow>
               ) : filtered.map(r => {
-                const isJSS = ["JSS1", "JSS2", "JSS3"].includes(r.students?.class || "");
+                const rClass = classOf(r);
+                const isJSS = ["JSS1", "JSS2", "JSS3"].includes(rClass);
                 return (
                 <Fragment key={r.id}>
                   <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => toggleExpand(r)}>
                     <TableCell className="font-medium">{r.students?.full_name}</TableCell>
-                    <TableCell>{r.students?.class}</TableCell>
+                    <TableCell>{rClass}</TableCell>
                     <TableCell>{r.average?.toFixed(1) || '—'}</TableCell>
                     <TableCell className="font-bold text-primary">{isJSS ? '—' : (r.overall_grade || '—')}</TableCell>
                     <TableCell>
