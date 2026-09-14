@@ -35,6 +35,22 @@ export default function ReportsPage() {
   }, [settingsLoading, settings]);
 
   const [histClass, setHistClass] = useState<Record<string, string>>({});
+  const [latestSession, setLatestSession] = useState<string>("");
+  const [alreadyPromoted, setAlreadyPromoted] = useState<string[]>([]);
+
+  // Track the newest session students have been promoted into, so past sessions
+  // can display each student one (or more) classes back.
+  const loadPromotionState = async () => {
+    const { data } = await supabase
+      .from('students')
+      .select('promoted_session')
+      .not('promoted_session', 'is', null);
+    const list = Array.from(new Set((data || []).map((r: any) => r.promoted_session).filter(Boolean)));
+    setAlreadyPromoted(list);
+    setLatestSession(list.sort().slice(-1)[0] || "");
+  };
+
+  useEffect(() => { loadPromotionState(); }, []);
 
   useEffect(() => {
     if (settingsLoading) return;
