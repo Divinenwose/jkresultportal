@@ -83,6 +83,7 @@ export default function ReportsPage() {
   const yearOf = (s: string) => parseInt(s?.split('/')[0] || '0', 10);
   const sessionChanged = pendingSession !== settings.active_session;
   const sessionAdvanced = yearOf(pendingSession) > yearOf(settings.active_session);
+  const promotionDone = alreadyPromoted.includes(pendingSession);
 
   const applySettings = async (promote: boolean) => {
     setSavingTerm(true);
@@ -107,7 +108,7 @@ export default function ReportsPage() {
   };
 
   const handleSaveSettings = async () => {
-    if (sessionAdvanced) {
+    if (sessionAdvanced && !promotionDone) {
       setConfirmOpen(true);
       return;
     }
@@ -135,7 +136,24 @@ export default function ReportsPage() {
     }
   };
 
-  const classOf = (r: any) => histClass[r.student_id] || r.students?.class || '';
+  // Walk a class back one level per session in the past
+  const shiftBack = (cls: string, steps: number) => {
+    const order = ["JSS1", "JSS2", "JSS3", "SS1", "SS2", "SS3"];
+    let i = order.indexOf(cls);
+    if (i < 0) return cls;
+    i = Math.max(0, i - steps);
+    return order[i];
+  };
+
+  const classOf = (r: any) => {
+    if (histClass[r.student_id]) return histClass[r.student_id];
+    const cls = r.students?.class || '';
+    const newest = latestSession && yearOf(latestSession) > yearOf(settings.active_session)
+      ? latestSession
+      : settings.active_session;
+    const steps = yearOf(newest) - yearOf(settings.active_session);
+    return steps > 0 ? shiftBack(cls, steps) : cls;
+  };
   const filtered = filterClass === 'all' ? reports : reports.filter(r => classOf(r) === filterClass);
 
   return (
