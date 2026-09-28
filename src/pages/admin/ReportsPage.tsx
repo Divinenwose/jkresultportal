@@ -181,14 +181,21 @@ export default function ReportsPage() {
               {" "}All results are kept, and you can switch sessions again at any time to restore the classes.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void applySettings(false)}>
-              Change session only (keep classes)
+          <AlertDialogFooter className="flex-col sm:flex-col gap-2">
+            <AlertDialogAction
+              onClick={() => void applySettings(true)}
+              className="w-full"
+            >
+              Yes, move students {sessionAdvanced ? "forward" : "back"} to {pendingSession}
             </AlertDialogAction>
-            <AlertDialogAction onClick={() => void applySettings(true)}>
-              Change session &amp; move students
-            </AlertDialogAction>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => void applySettings(false)}
+            >
+              Don&apos;t move students, just change the session
+            </Button>
+            <AlertDialogCancel className="w-full mt-0">Cancel</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
