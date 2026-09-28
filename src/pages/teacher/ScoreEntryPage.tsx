@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { calculateGrade, GRADE_SCALE } from "@/lib/constants";
+import { fetchClassRoster } from "@/lib/classRoster";
 import { useSettings } from "@/hooks/useSettings";
 import { Check, Save } from "lucide-react";
 
@@ -108,18 +109,13 @@ export default function ScoreEntryPage() {
 
     const fetchId = ++fetchIdRef.current;
     void (async () => {
-      const { data: studs } = await supabase
-        .from("students")
-        .select("*")
-        .eq("class", assignment.class)
-        .eq("graduated", false)
-        .order("full_name");
+      const studs = await fetchClassRoster(assignment.class, settings.active_session);
 
       if (fetchId !== fetchIdRef.current) return;
 
       setStudents(studs || []);
     })();
-  }, [assignments]);
+  }, [assignments, settings.active_session]);
 
 
   useEffect(() => {
@@ -144,12 +140,7 @@ export default function ScoreEntryPage() {
 
 
     const fetchData = async () => {
-      const { data: studs } = await supabase
-        .from("students")
-        .select("*")
-        .eq("class", assignment.class)
-        .eq("graduated", false)
-        .order("full_name");
+      const studs = await fetchClassRoster(assignment.class, settings.active_session);
 
       setStudents(studs || []);
       if (fetchId !== fetchIdRef.current) return;

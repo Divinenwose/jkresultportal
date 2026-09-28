@@ -253,9 +253,13 @@ export default function ReportCardPage() {
                     const term2 = prev.term2 ?? 0;
                     const currentTotal = Number(s.total) || 0;
 
+                    // Average only over terms that actually have a score (matches the admin Approve page)
                     let rowAvg = currentTotal;
-                    if (isSecondTerm) rowAvg = (currentTotal + term1) / 2;
-                    else if (isThirdTerm) rowAvg = (currentTotal + term1 + term2) / 3;
+                    if (showCumulative) {
+                      const terms = isThirdTerm ? [currentTotal, term1, term2] : [currentTotal, term1];
+                      const counted = terms.filter(t => t > 0).length || 1;
+                      rowAvg = terms.reduce((a, b) => a + b, 0) / counted;
+                    }
 
                     const rowGrade = calculateGrade(showCumulative ? rowAvg : currentTotal);
                     const rowRemark = (() => {

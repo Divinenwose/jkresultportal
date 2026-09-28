@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { CLASSES, calculateGrade, GRADE_SCALE } from "@/lib/constants";
+import { fetchClassRoster } from "@/lib/classRoster";
 import { useSettings } from "@/hooks/useSettings";
 import { CheckCircle, RefreshCw, Trash2 } from "lucide-react";
 
@@ -62,7 +63,7 @@ export default function ApprovePage() {
 
     setRefreshing(true);
     await new Promise((r) => setTimeout(r, 300));
-    const { data: studs } = await supabase.from('students').select('*').eq('class', selectedClass as any).eq('graduated', false).order('full_name');
+    const studs = await fetchClassRoster(selectedClass, session);
     setStudents(studs || []);
 
     if (studs?.length) {
