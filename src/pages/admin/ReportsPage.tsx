@@ -35,22 +35,6 @@ export default function ReportsPage() {
   }, [settingsLoading, settings]);
 
   const [histClass, setHistClass] = useState<Record<string, string>>({});
-  const [latestSession, setLatestSession] = useState<string>("");
-  const [alreadyPromoted, setAlreadyPromoted] = useState<string[]>([]);
-
-  // Track the newest session students have been promoted into, so past sessions
-  // can display each student one (or more) classes back.
-  const loadPromotionState = async () => {
-    const { data } = await supabase
-      .from('students')
-      .select('promoted_session')
-      .not('promoted_session', 'is', null);
-    const list = Array.from(new Set((data || []).map((r: any) => r.promoted_session).filter(Boolean)));
-    setAlreadyPromoted(list);
-    setLatestSession(list.sort().slice(-1)[0] || "");
-  };
-
-  useEffect(() => { loadPromotionState(); }, []);
 
   useEffect(() => {
     if (settingsLoading) return;
@@ -83,20 +67,20 @@ export default function ReportsPage() {
   const yearOf = (s: string) => parseInt(s?.split('/')[0] || '0', 10);
   const sessionChanged = pendingSession !== settings.active_session;
   const sessionAdvanced = yearOf(pendingSession) > yearOf(settings.active_session);
-  const promotionDone = alreadyPromoted.includes(pendingSession);
 
-  const applySettings = async (promote: boolean) => {
+  const applySettings = async (moveStudents: boolean) => {
+    setConfirmOpen(false);
     setSavingTerm(true);
     let promoMsg = "";
-    if (promote) {
-      const { data, error: rpcError } = await supabase.rpc('promote_students', { _new_session: pendingSession });
+    if (moveStudents) {
+      const { data, error: rpcError } = await (supabase.rpc as any)('move_students_to_session', { _target_session: pendingSession });
       if (rpcError) {
         setSavingTerm(false);
         toast.error(rpcError.message);
         return;
       }
       const row: any = Array.isArray(data) ? data[0] : data;
-      promoMsg = ` — ${row?.promoted ?? 0} moved up, ${row?.graduated ?? 0} graduated`;
+      promoMsg = ` — ${row?.moved_count ?? 0} students moved${row?.graduated_count ? `, ${row.graduated_count} graduated` : ''}`;
     }
     const { error } = await updateSettings({ active_term: pendingTerm, active_session: pendingSession });
     setSavingTerm(false);
@@ -108,7 +92,7 @@ export default function ReportsPage() {
   };
 
   const handleSaveSettings = async () => {
-    if (sessionAdvanced && !promotionDone) {
+    if (sessionChanged) {
       setConfirmOpen(true);
       return;
     }
@@ -136,24 +120,7 @@ export default function ReportsPage() {
     }
   };
 
-  // Walk a class back one level per session in the past
-  const shiftBack = (cls: string, steps: number) => {
-    const order = ["JSS1", "JSS2", "JSS3", "SS1", "SS2", "SS3"];
-    let i = order.indexOf(cls);
-    if (i < 0) return cls;
-    i = Math.max(0, i - steps);
-    return order[i];
-  };
-
-  const classOf = (r: any) => {
-    if (histClass[r.student_id]) return histClass[r.student_id];
-    const cls = r.students?.class || '';
-    const newest = latestSession && yearOf(latestSession) > yearOf(settings.active_session)
-      ? latestSession
-      : settings.active_session;
-    const steps = yearOf(newest) - yearOf(settings.active_session);
-    return steps > 0 ? shiftBack(cls, steps) : cls;
-  };
+  const classOf = (r: any) => histClass[r.student_id] || r.students?.class || '';
   const filtered = filterClass === 'all' ? reports : reports.filter(r => classOf(r) === filterClass);
 
   return (
@@ -206,20 +173,21 @@ export default function ReportsPage() {
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Start the {pendingSession} session?</AlertDialogTitle>
+            <AlertDialogTitle>Switch to the {pendingSession} session?</AlertDialogTitle>
             <AlertDialogDescription>
-              Every student moves up one class (JSS1 to JSS2, JSS2 to JSS3, JSS3 to SS1, SS1 to SS2, SS2 to SS3),
-              and SS3 students are marked as graduated and moved to the Graduated list.
-              All past results are kept, and this can safely be run only once for {pendingSession}.
+              {sessionAdvanced
+                ? `Students will be moved forward to the class they are in for ${pendingSession}, and SS3 students who have finished will be marked as graduated.`
+                : `Students will be moved back to the class they were in for ${pendingSession}, and students who had graduated by then will return to SS3.`}
+              {" "}All results are kept, and you can switch sessions again at any time to restore the classes.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => void applySettings(false)}>
-              Change session only
+              Change session only (keep classes)
             </AlertDialogAction>
             <AlertDialogAction onClick={() => void applySettings(true)}>
-              Promote students &amp; change session
+              Change session &amp; move students
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

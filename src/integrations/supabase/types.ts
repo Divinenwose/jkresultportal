@@ -324,11 +324,11 @@ export type Database = {
         }
         Returns: boolean
       }
-      promote_students: {
-        Args: { _new_session: string }
+      move_students_to_session: {
+        Args: { _target_session: string }
         Returns: {
-          graduated: number
-          promoted: number
+          graduated_count: number
+          moved_count: number
         }[]
       }
     }
